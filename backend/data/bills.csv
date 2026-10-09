@@ -1,0 +1,147 @@
+vendor,due_date,amount,type
+Landlord,2025-11-01,60000.0,rent
+Staff,2025-11-30,190000.0,salary
+GST Dept,2025-11-20,28738.0,GST
+Utilities,2025-11-10,9980.0,utilities
+Landlord,2025-12-01,60000.0,rent
+Staff,2025-12-30,190000.0,salary
+GST Dept,2025-12-20,36340.0,GST
+Utilities,2025-12-10,8106.0,utilities
+Landlord,2026-01-01,60000.0,rent
+Staff,2026-01-30,190000.0,salary
+GST Dept,2026-01-20,38051.0,GST
+Utilities,2026-01-10,10192.0,utilities
+Landlord,2026-02-01,60000.0,rent
+Staff,2026-03-02,190000.0,salary
+GST Dept,2026-02-20,39082.0,GST
+Utilities,2026-02-10,8016.0,utilities
+Landlord,2026-03-01,60000.0,rent
+Staff,2026-03-30,190000.0,salary
+GST Dept,2026-03-20,45358.0,GST
+Utilities,2026-03-10,11369.0,utilities
+Landlord,2026-04-01,60000.0,rent
+Staff,2026-04-30,190000.0,salary
+GST Dept,2026-04-20,40967.0,GST
+Utilities,2026-04-10,10460.0,utilities
+Landlord,2026-05-01,60000.0,rent
+Staff,2026-05-30,190000.0,salary
+GST Dept,2026-05-20,45452.0,GST
+Utilities,2026-05-10,10695.0,utilities
+Landlord,2026-06-01,60000.0,rent
+Staff,2026-06-30,190000.0,salary
+GST Dept,2026-06-20,41685.0,GST
+Utilities,2026-06-10,9898.0,utilities
+Landlord,2026-07-01,60000.0,rent
+Staff,2026-07-30,190000.0,salary
+GST Dept,2026-07-20,41118.0,GST
+Utilities,2026-07-10,7354.0,utilities
+Landlord,2026-08-01,60000.0,rent
+Staff,2026-08-30,190000.0,salary
+GST Dept,2026-08-20,42204.0,GST
+Utilities,2026-08-10,6966.0,utilities
+Landlord,2026-09-01,60000.0,rent
+Staff,2026-09-30,190000.0,salary
+GST Dept,2026-09-20,33232.0,GST
+Utilities,2026-09-10,10955.0,utilities
+Landlord,2026-10-01,60000.0,rent
+Staff,2026-10-30,190000.0,salary
+GST Dept,2026-10-20,43041.0,GST
+Utilities,2026-10-10,11231.0,utilities
+Landlord,2026-11-01,60000.0,rent
+Staff,2026-11-30,190000.0,salary
+GST Dept,2026-11-20,36370.0,GST
+Utilities,2026-11-10,7272.0,utilities
+Landlord,2026-12-01,60000.0,rent
+Staff,2026-12-30,190000.0,salary
+GST Dept,2026-12-20,36557.0,GST
+Utilities,2026-12-10,9153.0,utilities
+Supplier 8,2026-06-09,31788.0,supplier
+Supplier 2,2026-02-25,21504.0,supplier
+Supplier 1,2026-02-06,22588.0,supplier
+Supplier 1,2026-01-14,12396.0,supplier
+Supplier 7,2026-10-06,16447.0,supplier
+Supplier 6,2026-03-02,43725.0,supplier
+Supplier 2,2026-03-04,15963.0,supplier
+Supplier 7,2025-11-06,11532.0,supplier
+Supplier 5,2026-06-02,12798.0,supplier
+Supplier 1,2025-10-28,16606.0,supplier
+Supplier 6,2026-05-29,18599.0,supplier
+Supplier 7,2026-02-26,17251.0,supplier
+Supplier 7,2026-05-26,42591.0,supplier
+Supplier 3,2026-02-18,6629.0,supplier
+Supplier 2,2026-07-02,18165.0,supplier
+Supplier 1,2026-11-22,22846.0,supplier
+Supplier 2,2026-03-02,30017.0,supplier
+Supplier 7,2025-10-28,19772.0,supplier
+Supplier 8,2026-08-03,20668.0,supplier
+Supplier 6,2026-12-03,25563.0,supplier
+Supplier 4,2026-11-04,18046.0,supplier
+Supplier 8,2026-11-19,5295.0,supplier
+Supplier 2,2026-04-21,9961.0,supplier
+Supplier 6,2026-04-29,15878.0,supplier
+Supplier 6,2026-01-25,11019.0,supplier
+Supplier 5,2026-08-23,61618.0,supplier
+Supplier 6,2026-03-16,14678.0,supplier
+Supplier 1,2026-05-23,10152.0,supplier
+Supplier 4,2026-03-17,17010.0,supplier
+Supplier 4,2026-02-09,17285.0,supplier
+Supplier 7,2025-11-23,12320.0,supplier
+Supplier 4,2025-12-16,21657.0,supplier
+Supplier 5,2025-12-05,9318.0,supplier
+Supplier 5,2026-04-19,12087.0,supplier
+Supplier 1,2026-10-03,17938.0,supplier
+Supplier 2,2025-10-14,15397.0,supplier
+Supplier 6,2026-09-03,24501.0,supplier
+Supplier 8,2026-10-01,38789.0,supplier
+Supplier 4,2026-09-27,15862.0,supplier
+Supplier 1,2026-04-29,47425.0,supplier
+Supplier 5,2026-04-29,9760.0,supplier
+Supplier 6,2026-02-14,37891.0,supplier
+Supplier 1,2026-10-24,9309.0,supplier
+Supplier 4,2025-11-23,22250.0,supplier
+Supplier 2,2025-11-12,13026.0,supplier
+Supplier 3,2025-12-25,12630.0,supplier
+Supplier 1,2026-01-21,56433.0,supplier
+Supplier 3,2026-03-04,28096.0,supplier
+Supplier 2,2026-04-05,16433.0,supplier
+Supplier 8,2025-10-23,4789.0,supplier
+Supplier 1,2026-08-26,7293.0,supplier
+Supplier 5,2026-04-23,9920.0,supplier
+Supplier 7,2026-01-02,17637.0,supplier
+Supplier 7,2025-11-22,22148.0,supplier
+Supplier 8,2025-12-09,11494.0,supplier
+Supplier 4,2026-01-07,25961.0,supplier
+Supplier 8,2026-04-27,23856.0,supplier
+Supplier 7,2026-11-03,13701.0,supplier
+Supplier 8,2026-09-15,9976.0,supplier
+Supplier 4,2026-05-23,5754.0,supplier
+Supplier 4,2026-11-20,21237.0,supplier
+Supplier 5,2026-09-12,18275.0,supplier
+Supplier 3,2026-07-15,24565.0,supplier
+Supplier 1,2026-12-01,34149.0,supplier
+Supplier 5,2025-10-23,41848.0,supplier
+Supplier 4,2026-07-20,30407.0,supplier
+Supplier 6,2026-09-15,14675.0,supplier
+Supplier 8,2026-09-15,16551.0,supplier
+Supplier 3,2026-09-03,29250.0,supplier
+Supplier 5,2026-11-25,12107.0,supplier
+Supplier 6,2026-02-10,12548.0,supplier
+Supplier 3,2026-03-16,26562.0,supplier
+Supplier 4,2025-11-08,43037.0,supplier
+Supplier 2,2026-02-16,29723.0,supplier
+Supplier 4,2026-11-25,26846.0,supplier
+Supplier 5,2026-09-06,17592.0,supplier
+Supplier 3,2026-05-24,11872.0,supplier
+Supplier 8,2026-11-26,24962.0,supplier
+Supplier 6,2025-11-23,38890.0,supplier
+Supplier 8,2026-07-16,14951.0,supplier
+Supplier 8,2025-11-23,13203.0,supplier
+Supplier 1,2026-11-30,13361.0,supplier
+Supplier 6,2026-11-11,21630.0,supplier
+Supplier 1,2025-11-14,32755.0,supplier
+Supplier 7,2025-12-13,6588.0,supplier
+Supplier 4,2026-01-04,18587.0,supplier
+Supplier 7,2026-06-08,9291.0,supplier
+Supplier 8,2026-10-19,49107.0,supplier
+Supplier 5,2026-10-06,19631.0,supplier
+Supplier 2,2026-07-22,14805.0,supplier
