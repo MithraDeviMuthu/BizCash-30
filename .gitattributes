@@ -1,0 +1,3 @@
+package-lock.json linguist-generated
+frontend/dist/** linguist-generated
+*.min.js linguist-vendored
