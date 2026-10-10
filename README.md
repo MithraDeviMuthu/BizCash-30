@@ -139,7 +139,3 @@ BizCash-30/
 - 📏 Only quote accuracy numbers that `/api/backtest` actually shows
 
 ---
-
-## 📄 License
-
-MITs
