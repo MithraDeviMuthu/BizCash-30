@@ -17,6 +17,11 @@ def backtest():
     return engine.backtest(engine.load())
 
 
+@app.get("/api/overview")
+def overview():
+    return engine.overview(engine.load())
+
+
 @app.post("/api/upload/{table}")
 async def upload(table: str, file: UploadFile = File(...)):
     """Replace one of: sales, invoices, bills, expenses, balance with your own CSV."""

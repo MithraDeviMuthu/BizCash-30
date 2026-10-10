@@ -87,9 +87,18 @@ def simulate(data, runs=RUNS, extra_delay=0, delay_bill_id=None, seed=7):
     chase["due_date"] = chase["due_date"].dt.strftime("%Y-%m-%d")
     chase = chase.round(1)
 
+    inflows = sales_in.copy()
+    for _, row in op.iterrows():
+        k = (row["expected_pay"] - dates[0]).days
+        if 0 <= k < HORIZON:
+            inflows[k] += row["amount"]
+
     return dict(
         dates=[str(d.date()) for d in dates],
         p10=p10.round().tolist(), p50=p50.round().tolist(), p90=p90.round().tolist(),
+        inflows=inflows.round().tolist(),
+        outflows=out.round().tolist(),
+        opening=round(float(data["opening"])),
         alert=alert, chase=chase.to_dict("records"),
         open_invoices=int(len(op)), open_amount=round(float(op["amount"].sum())),
         min_p50=round(float(p50.min())),
@@ -104,3 +113,114 @@ def backtest(data, cut_back=30):
     test["pred"] = test["date"].dt.dayofweek.map(m)
     mae = float((test["amount"] - test["pred"]).abs().mean())
     return dict(sales_mae=round(mae), sales_mape_pct=round(100 * mae / float(test["amount"].mean()), 1))
+
+
+def overview(data):
+    """Dashboard KPIs, monthly income vs expenses, pending invoices, upcoming bills."""
+    today = data["sales"]["date"].max()
+    start30 = today - pd.Timedelta(days=29)
+    sales, exp, bills, inv = data["sales"], data["exp"], data["bills"], data["inv"]
+
+    collected = inv.dropna(subset=["paid_date"])
+    income_30 = float(sales.loc[sales["date"] >= start30, "amount"].sum())
+    collected_30 = float(collected.loc[collected["paid_date"] >= start30, "amount"].sum())
+    total_income = round(income_30 + collected_30)
+
+    bills_30 = bills[(bills["due_date"] >= start30) & (bills["due_date"] <= today)]
+    exp_30 = exp[(exp["date"] >= start30) & (exp["date"] <= today)]
+    total_expenses = round(float(exp_30["amount"].sum() + bills_30["amount"].sum()))
+
+    s = sales[sales["date"] <= today].copy(); s["month"] = s["date"].dt.to_period("M").astype(str)
+    e = exp[exp["date"] <= today].copy(); e["month"] = e["date"].dt.to_period("M").astype(str)
+    b = bills[bills["due_date"] <= today].copy(); b["month"] = b["due_date"].dt.to_period("M").astype(str)
+    paid = collected[collected["paid_date"] <= today].copy(); paid["month"] = paid["paid_date"].dt.to_period("M").astype(str)
+    inc_m = s.groupby("month")["amount"].sum().add(paid.groupby("month")["amount"].sum(), fill_value=0)
+    exp_m = e.groupby("month")["amount"].sum().add(b.groupby("month")["amount"].sum(), fill_value=0)
+    months = sorted(set(inc_m.index) | set(exp_m.index))[-6:]
+    monthly = [
+        dict(month=m, income=round(float(inc_m.get(m, 0))), expenses=round(float(exp_m.get(m, 0))))
+        for m in months
+    ]
+
+    pending = inv[inv["paid_date"].isna()].copy()
+    pending["days_overdue"] = (today - pending["due_date"]).dt.days
+    pending = pending.sort_values(["days_overdue", "amount"], ascending=False)
+    pending_rows = [
+        dict(
+            invoice_id=r.invoice_id, customer_id=r.customer_id,
+            amount=round(float(r.amount)), due_date=r.due_date.strftime("%Y-%m-%d"),
+            days_overdue=int(r.days_overdue),
+        )
+        for r in pending.itertuples()
+    ]
+
+    upcoming = bills[(bills["due_date"] > today) & (bills["due_date"] <= today + pd.Timedelta(days=45))]
+    upcoming = upcoming.sort_values("due_date")
+    bill_rows = [
+        dict(vendor=r.vendor, type=r.type, amount=round(float(r.amount)), due_date=r.due_date.strftime("%Y-%m-%d"))
+        for r in upcoming.itertuples()
+    ]
+
+    history_dates = pd.date_range(end=today, periods=365)
+    sales_daily = sales.groupby("date")["amount"].sum().reindex(history_dates, fill_value=0)
+    payments_daily = collected.groupby("paid_date")["amount"].sum().reindex(history_dates, fill_value=0)
+    expenses_daily = exp.groupby("date")["amount"].sum().reindex(history_dates, fill_value=0)
+    bills_daily = bills.groupby("due_date")["amount"].sum().reindex(history_dates, fill_value=0)
+    daily_income = sales_daily + payments_daily
+    daily_expenses = expenses_daily + bills_daily
+    daily_net = daily_income - daily_expenses
+    balances = float(data["opening"]) - daily_net.sum() + daily_net.cumsum()
+    daily_history = [
+        dict(
+            date=d.strftime("%Y-%m-%d"),
+            income=round(float(daily_income.iloc[i]), 2),
+            expenses=round(float(daily_expenses.iloc[i]), 2),
+            balance=round(float(balances.iloc[i])),
+        )
+        for i, d in enumerate(history_dates)
+    ]
+
+    transaction_start = today - pd.Timedelta(days=179)
+    recent_transactions = []
+    for row in sales[(sales["date"] >= transaction_start) & (sales["date"] <= today)].itertuples():
+        recent_transactions.append(dict(
+            date=row.date.strftime("%Y-%m-%d"),
+            description="Daily sales",
+            category="Sales",
+            amount=round(float(row.amount)),
+            type="income",
+            status="Recorded",
+        ))
+    for row in collected[
+        (collected["paid_date"] >= transaction_start) & (collected["paid_date"] <= today)
+    ].itertuples():
+        recent_transactions.append(dict(
+            date=row.paid_date.strftime("%Y-%m-%d"),
+            description=f"Invoice {row.invoice_id} payment",
+            category="Customer payment",
+            amount=round(float(row.amount)),
+            type="income",
+            status="Collected",
+        ))
+    for row in exp[(exp["date"] >= transaction_start) & (exp["date"] <= today)].itertuples():
+        recent_transactions.append(dict(
+            date=row.date.strftime("%Y-%m-%d"),
+            description=f"{str(row.category).title()} expense",
+            category=str(row.category),
+            amount=round(float(row.amount)),
+            type="expense",
+            status="Recorded",
+        ))
+    recent_transactions.sort(key=lambda row: row["date"], reverse=True)
+
+    return dict(
+        as_of=str(today.date()),
+        total_income=total_income,
+        total_expenses=total_expenses,
+        available_cash=round(float(data["opening"])),
+        daily_history=daily_history,
+        recent_transactions=recent_transactions,
+        pending_invoices=pending_rows,
+        upcoming_bills=bill_rows,
+        monthly=monthly,
+    )
