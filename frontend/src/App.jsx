@@ -14,7 +14,7 @@ import {
   YAxis,
 } from "recharts";
 
-const API = "";
+const API = "https://bizcash-30.onrender.com";
 const RANGE_OPTIONS = [
   { days: 30, label: "Last 30 days" },
   { days: 90, label: "Last 90 days" },
