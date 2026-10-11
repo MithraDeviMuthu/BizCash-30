@@ -184,16 +184,16 @@ function Icon({ name, size = 19 }) {
 }
 
 const PLOT_AXIS = {
-  tickfont: { size: 11, color: "#8794a8" },
-  gridcolor: "#edf1f6",
+  tickfont: { size: 11, color: "#667085" },
+  gridcolor: "#eef0f3",
   linecolor: "rgba(0,0,0,0)",
   zeroline: false,
   fixedrange: true,
 };
-const moneyAxis = { ...PLOT_AXIS, tickprefix: "₹", tickformat: "~s", zeroline: true, zerolinecolor: "#cbd5e1" };
+const moneyAxis = { ...PLOT_AXIS, tickprefix: "₹", tickformat: "~s", zeroline: true, zerolinecolor: "#d0d5dd" };
 const dateAxis = { ...PLOT_AXIS, type: "date", tickformat: "%-d %b", hoverformat: "%-d %b %Y", showgrid: false, nticks: 8 };
-const legendBelow = { orientation: "h", x: 0.5, xanchor: "center", y: -0.2, font: { size: 11, color: "#67768d" } };
-const dividerAt = (x) => ({ type: "line", xref: "x", x0: x, x1: x, yref: "paper", y0: 0, y1: 1, line: { color: "#a8b4c4", width: 1, dash: "dot" } });
+const legendBelow = { orientation: "h", x: 0.5, xanchor: "center", y: -0.2, font: { size: 11, color: "#667085" } };
+const dividerAt = (x) => ({ type: "line", xref: "x", x0: x, x1: x, yref: "paper", y0: 0, y1: 1, line: { color: "#98a2b3", width: 1, dash: "dot" } });
 
 function PlotlyChart({ data, layout = {}, height = 280 }) {
   const ref = useRef(null);
@@ -206,7 +206,7 @@ function PlotlyChart({ data, layout = {}, height = 280 }) {
         margin: { t: 10, r: 8, l: 50, b: layout.showlegend ? 55 : 30 },
         paper_bgcolor: "rgba(0,0,0,0)",
         plot_bgcolor: "rgba(0,0,0,0)",
-        font: { family: "inherit", size: 11, color: "#67768d" },
+        font: { family: "inherit", size: 11, color: "#667085" },
         hovermode: "x unified",
         showlegend: false,
         ...layout,
@@ -229,10 +229,10 @@ function BalanceChart({ history, forecast }) {
   });
   const data = [
     { type: "scatter", mode: "lines", x: forecast.dates, y: forecast.p90, line: { width: 0 }, hoverinfo: "skip" },
-    { type: "scatter", mode: "lines", name: "Forecast range", x: forecast.dates, y: forecast.p10, line: { width: 0 }, fill: "tonexty", fillcolor: "rgba(91,167,247,0.2)", hoverinfo: "skip" },
-    line("Reconstructed balance", past.map((row) => row.date), past.map((row) => row.balance), { color: "#152f55", width: 2.5 }),
-    line("Expected balance", forecast.dates, forecast.p50, { color: "#3688e8", width: 2.5 }),
-    line("Conservative case", forecast.dates, forecast.p10, { color: "#e49b42", width: 1.6, dash: "dash" }),
+    { type: "scatter", mode: "lines", name: "Forecast range", x: forecast.dates, y: forecast.p10, line: { width: 0 }, fill: "tonexty", fillcolor: "rgba(99, 102, 241, 0.13)", hoverinfo: "skip" },
+    line("Reconstructed balance", past.map((row) => row.date), past.map((row) => row.balance), { color: "#344054", width: 2.5 }),
+    line("Expected balance", forecast.dates, forecast.p50, { color: "#3b82f6", width: 2.7 }),
+    line("Conservative case", forecast.dates, forecast.p10, { color: "#f59e0b", width: 1.8, dash: "dash" }),
   ];
   const layout = { xaxis: dateAxis, yaxis: moneyAxis, shapes: past.length ? [dividerAt(past[past.length - 1].date)] : [] };
 
@@ -259,8 +259,8 @@ function FlowChart({ history, forecast }) {
     hovertemplate: "%{customdata[0]}: %{customdata[1]}<extra></extra>",
   });
   const data = [
-    bars("Income", "Expected inflow", income, "#3988e8", "#93c5fd"),
-    bars("Expenses", "Expected outflow", expenses, "#aab8ca", "#d8e0e9"),
+    bars("Income", "Expected inflow", income, "#10b981", "#a7e8d1"),
+    bars("Expenses", "Expected outflow", expenses, "#ef4444", "#ffc2b8"),
   ];
   const layout = {
     xaxis: dateAxis, yaxis: moneyAxis, barmode: "group", bargap: 0.25, showlegend: true, legend: legendBelow,
@@ -275,7 +275,7 @@ function MonthlyChart({ rows }) {
     type: "bar", name, x: labels, y: rows.map((row) => row[key]), marker: { color },
     customdata: rows.map((row) => inr(row[key])), hovertemplate: `${name}: %{customdata}<extra></extra>`,
   });
-  const data = [bars("Income", "income", "#3988e8"), bars("Expenses", "expenses", "#aab8ca")];
+  const data = [bars("Income", "income", "#10b981"), bars("Expenses", "expenses", "#ef4444")];
   const layout = {
     xaxis: { ...PLOT_AXIS, type: "category", showgrid: false }, yaxis: moneyAxis,
     barmode: "group", bargap: 0.35, showlegend: true, legend: legendBelow,
@@ -309,26 +309,47 @@ function CardHeader({ title, subtitle, action }) {
   );
 }
 
-function Kpis({ overview, forecast, summary, rangeLabel, lowest }) {
+function Kpis({ overview, forecast, summary, rangeLabel, dashboard = false }) {
   const predicted = forecast?.p50?.[forecast.p50.length - 1];
-  const items = [
-    { label: "Total income", value: summary.income, note: rangeLabel, icon: "income", color: "blue" },
-    lowest != null
-      ? { label: "Lowest expected balance", value: lowest, note: "Worst day · next 30 days", icon: "wallet", color: "orange" }
-      : { label: "Total expenses", value: summary.expenses, note: rangeLabel, icon: "expense", color: "orange" },
-    { label: "Current cash balance", value: overview.available_cash, note: `As of ${fmtDate(overview.as_of)}`, icon: "wallet", color: "navy" },
-    { label: "Predicted cash balance", value: predicted, note: "Expected · day 30", icon: "forecast", color: "green" },
-  ];
+  const netCashFlow = summary.income - summary.expenses;
+  const items = dashboard
+    ? [
+        { label: "Total income", value: summary.income, note: rangeLabel, icon: "income", color: "blue" },
+        { label: "Total expenses", value: summary.expenses, note: rangeLabel, icon: "expense", color: "orange" },
+        { label: "Current cash balance", value: overview.available_cash, note: `As of ${fmtDate(overview.as_of)}`, icon: "wallet", color: Number(overview.available_cash) < 0 ? "negative" : "navy" },
+        { label: "Net cash flow", value: netCashFlow, note: rangeLabel, icon: "cashflow", color: netCashFlow < 0 ? "negative" : "green", signed: true },
+        { label: "30-day predicted balance", value: predicted, note: "Expected · day 30", icon: "forecast", color: Number(predicted) < 0 ? "negative" : "indigo" },
+        {
+          label: "Cash shortage risk",
+          value: forecast.alert ? "At risk" : "Low risk",
+          note: forecast.alert ? `Potential dip · ${fmtDate(forecast.alert.date)}` : "No buffer breach expected",
+          icon: "bell",
+          color: forecast.alert ? "risk" : "green",
+          textValue: true,
+        },
+      ]
+    : [
+        { label: "Total income", value: summary.income, note: rangeLabel, icon: "income", color: "blue" },
+        { label: "Total expenses", value: summary.expenses, note: rangeLabel, icon: "expense", color: "orange" },
+        { label: "Current cash balance", value: overview.available_cash, note: `As of ${fmtDate(overview.as_of)}`, icon: "wallet", color: Number(overview.available_cash) < 0 ? "negative" : "navy" },
+        { label: "Predicted cash balance", value: predicted, note: "Expected · day 30", icon: "forecast", color: Number(predicted) < 0 ? "negative" : "green" },
+      ];
 
   return (
-    <section className="kpi-grid" aria-label="Financial summary">
+    <section className={`kpi-grid ${dashboard ? "dashboard-kpis" : ""}`} aria-label="Financial summary">
       {items.map((item) => (
         <article className={`kpi-card ${item.color}`} key={item.label}>
           <div className="kpi-top">
             <span>{item.label}</span>
             <span className="kpi-icon"><Icon name={item.icon} size={19} /></span>
           </div>
-          <strong>{inr(item.value)}</strong>
+          <strong>
+            {item.textValue
+              ? item.value
+              : item.signed
+                ? `${item.value >= 0 ? "+" : "−"}${inr(Math.abs(Number(item.value) || 0))}`
+                : inr(item.value)}
+          </strong>
           <small>{item.note}</small>
         </article>
       ))}
@@ -790,7 +811,7 @@ export default function App() {
             <>
               {page === "dashboard" && (
                 <>
-                  <Kpis overview={overview} forecast={forecast} summary={summary} rangeLabel={rangeLabel} lowest={forecast.min_p50} />
+                  <Kpis overview={overview} forecast={forecast} summary={summary} rangeLabel={rangeLabel} dashboard />
                   <div className={`forecast-banner ${forecast.alert ? "risk" : "healthy"}`}>
                     <span className="banner-icon"><Icon name={forecast.alert ? "bell" : "forecast"} /></span>
                     <div><b>{forecast.alert ? "Cash flow needs attention" : "Your cash outlook is looking steady"}</b><p>{forecast.alert ? `Projected balance could fall below your safety buffer by ${fmtDate(forecast.alert.date)}. Estimated gap ${inr(forecast.alert.gap)}.${plan ? ` Collecting ${plan.picks.map((r) => r.invoice_id).join(", ")} (${inr(plan.total)}) ${plan.covers ? "would cover it" : "would help close it"}.` : ""}` : `No balance dip below the ${bufferText(forecast)} safety buffer is projected over the next 30 days.`}</p></div>
