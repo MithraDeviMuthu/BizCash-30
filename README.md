@@ -6,7 +6,7 @@
 ![Vite](https://img.shields.io/badge/Vite-Frontend-646CFF?logo=vite&logoColor=white&labelColor=1a1a1a)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white&labelColor=1a1a1a)
 ![Python](https://img.shields.io/badge/Python-3-3776AB?logo=python&logoColor=white&labelColor=1a1a1a)
-![License](https://img.shields.io/badge/License-MIT-yellow?labelColor=1a1a1a)
+
 
 📈 Forecast cash. ⚠️ Catch shortfalls early. 📞 Chase the right customers first.
 
