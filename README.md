@@ -19,10 +19,11 @@
 |   | Feature | Description |
 |---|---------|-------------|
 | 📊 | **30-day forecast** | Cash-flow and balance forecast for the next 30 days |
-| 🎲 | **Monte Carlo scenarios** | Best, expected and worst-case cash paths |
+| 🎲 | **Monte Carlo scenarios** | 2,000 simulated 30-day cash paths, summarised as best (p90), expected (p50) and worst-case (p10) |
 | 🚨 | **Shortfall alerts** | Warns when projected cash drops below a safe buffer |
 | 📞 | **Collections queue** | Ranks which customers to chase first, based on learned payment behavior |
 | 🧾 | **Invoices & bills** | Open invoices, upcoming bills and searchable transactions |
+| 🗓️ | **Date filter** | View history for the last 30 days, 90 days, 6 months or 12 months |
 | 📉 | **Damped-trend sales forecast** | Weekday-seasonal damped trend, backtested against a plain weekday average |
 | 🔎 | **Backtesting** | Check forecast accuracy against past data |
 | 📊 | **Plotly & Matplotlib charts** | Interactive Plotly forecast chart and static Matplotlib PNG |
@@ -67,7 +68,7 @@
 1. 📤 Sales, invoices, bills, expenses and balance data are loaded from CSVs
 2. 🧠 The engine learns how each customer pays (typical delays)
 3. 📈 Daily sales are forecast with a weekday-seasonal damped trend
-4. 🎲 Monte Carlo simulation runs many possible 30-day cash paths
+4. 🎲 Monte Carlo simulation runs 2,000 possible 30-day cash paths (random sales noise and random customer payment delays), where each day's closing cash = opening cash + money in − money out
 5. 🚨 Paths are compared to the safe-cash buffer to raise shortfall alerts
 6. 📞 Open invoices are ranked to show who to chase first
 7. 📊 The React dashboard displays everything through the FastAPI endpoints
@@ -113,7 +114,9 @@ python charts.py             # saves a Matplotlib PNG to docs/images/
 
 ## 🗂️ Using your own data
 
-Copy your sales file to `backend/data/sales_raw.csv` (Rossmann `train.csv`, or any CSV with `Date` and `Sales` columns), then run `python make_data.py` again.
+Copy your sales file to `backend/data/sales_raw.csv` (Rossmann `train.csv`, or any CSV with `Date` and `Sales` columns), then run `python make_data.py` again. About 1 year of daily sales works well.
+
+⚠️ Don't copy the raw file over `backend/data/sales.csv`. The engine needs the generated `sales.csv` with lowercase `date,amount` columns, otherwise loading fails with `Missing column provided to 'parse_dates': 'date'`.
 
 📝 Invoices, bills, expenses and the opening balance are synthetic. You can also upload your own CSVs from **Settings** in the dashboard.
 
@@ -124,7 +127,7 @@ Copy your sales file to `backend/data/sales_raw.csv` (Rossmann `train.csv`, or a
 | Endpoint | Purpose |
 |----------|---------|
 | `GET /api/overview` | Summary, 365-day income/expense history, recent activity |
-| `GET /api/forecast` | 30-day forecast and scenarios |
+| `GET /api/forecast` | 30-day forecast and scenarios (`?runs=2000&extra_delay=0`) |
 | `GET /api/chart/forecast` | Interactive Plotly forecast chart (HTML) |
 | `GET /api/backtest` | Forecast accuracy against past data |
 | `POST /api/upload/{table}` | Validate and upload a CSV to replace a data table (returns 400 with the reason if invalid) |
@@ -138,7 +141,7 @@ Tunables in `backend/engine.py`:
 | Constant | Meaning |
 |----------|---------|
 | `BUFFER` | Minimum safe cash level (also shown on the dashboard) |
-| `RUNS` | Number of simulations |
+| `RUNS` | Number of simulations (2,000). The dashboard also sends `runs=` from `RUNS` in `frontend/src/App.jsx`, which overrides this default, so change both |
 | `HORIZON` | Forecast length in days (30) |
 
 ---
