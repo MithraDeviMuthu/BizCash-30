@@ -1,6 +1,7 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import engine
+from validate import validate
 
 app = FastAPI(title="BizCash 30")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -25,7 +26,9 @@ def overview():
 @app.post("/api/upload/{table}")
 async def upload(table: str, file: UploadFile = File(...)):
     """Replace one of: sales, invoices, bills, expenses, balance with your own CSV."""
-    if table not in {"sales", "invoices", "bills", "expenses", "balance"}:
-        return {"error": "unknown table"}
-    (engine.D / f"{table}.csv").write_bytes(await file.read())
+    raw = await file.read()
+    errors = validate(table, raw)
+    if errors:
+        raise HTTPException(status_code=400, detail="; ".join(errors))
+    (engine.D / f"{table}.csv").write_bytes(raw)
     return {"ok": True, "table": table}

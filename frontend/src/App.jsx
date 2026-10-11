@@ -47,6 +47,19 @@ const fmtDate = (value, options = { day: "numeric", month: "short" }) => {
 };
 const inr = (value) => `₹${Math.round(Number(value) || 0).toLocaleString("en-IN")}`;
 const inrK = (value) => `₹${Math.round((Number(value) || 0) / 1000)}k`;
+const days = (n) => `${n} ${n === 1 ? "day" : "days"}`;
+const closeGap = (alert, chase = []) => {
+  if (!alert || !chase.length) return null;
+  const picks = [];
+  let total = 0;
+  for (const row of chase) {
+    if (picks.length === 3 || total >= alert.gap) break;
+    picks.push(row);
+    total += Number(row.amount) || 0;
+  }
+  return { picks, total, covers: total >= alert.gap };
+};
+const bufferText = (f) => inr(f?.buffer ?? 50000);
 const sum = (rows, key) => rows.reduce((total, row) => total + (Number(row[key]) || 0), 0);
 
 function makeDemoOverview() {
@@ -140,6 +153,7 @@ const DEMO_FORECAST = {
   open_invoices: 12,
   open_amount: 186400,
   min_p50: 21400,
+  buffer: 50000,
 };
 
 function Icon({ name, size = 19 }) {
@@ -334,11 +348,13 @@ function CardHeader({ title, subtitle, action }) {
   );
 }
 
-function Kpis({ overview, forecast, summary, rangeLabel }) {
+function Kpis({ overview, forecast, summary, rangeLabel, lowest }) {
   const predicted = forecast?.p50?.[forecast.p50.length - 1];
   const items = [
     { label: "Total income", value: summary.income, note: rangeLabel, icon: "income", color: "blue" },
-    { label: "Total expenses", value: summary.expenses, note: rangeLabel, icon: "expense", color: "orange" },
+    lowest != null
+      ? { label: "Lowest expected balance", value: lowest, note: "Worst day · next 30 days", icon: "wallet", color: "orange" }
+      : { label: "Total expenses", value: summary.expenses, note: rangeLabel, icon: "expense", color: "orange" },
     { label: "Current cash balance", value: overview.available_cash, note: `As of ${fmtDate(overview.as_of)}`, icon: "wallet", color: "navy" },
     { label: "Predicted cash balance", value: predicted, note: "Expected · day 30", icon: "forecast", color: "green" },
   ];
@@ -395,7 +411,7 @@ function InvoiceTable({ rows }) {
               <td><b>{row.invoice_id}</b></td>
               <td>{row.customer_id}</td>
               <td>{fmtDate(row.due_date, { day: "numeric", month: "short", year: "numeric" })}</td>
-              <td><span className={`status-pill ${row.days_overdue > 0 ? "overdue" : "upcoming"}`}>{row.days_overdue > 0 ? `${row.days_overdue} days` : "Not overdue"}</span></td>
+              <td><span className={`status-pill ${row.days_overdue > 0 ? "overdue" : "upcoming"}`}>{row.days_overdue > 0 ? days(row.days_overdue) : "Not overdue"}</span></td>
               <td className="amount-cell">{inr(row.amount)}</td>
             </tr>
           ))}
@@ -425,7 +441,7 @@ function ChaseTable({ rows }) {
   return (
     <div className="table-scroll">
       <table>
-        <thead><tr><th>Rank</th><th>Customer</th><th>Invoice</th><th>Amount overdue</th><th>Days late</th><th>Usual delay</th><th>Priority</th></tr></thead>
+        <thead><tr><th>Rank</th><th>Customer</th><th>Invoice</th><th>Amount due</th><th>Days late</th><th>Usual delay</th><th>Priority</th></tr></thead>
         <tbody>
           {rows.map((row, index) => {
             const priority = row.days_overdue > 15 || row.avg_delay_days > 20
@@ -439,8 +455,8 @@ function ChaseTable({ rows }) {
                 <td><b>{row.customer_id}</b></td>
                 <td>{row.invoice_id}</td>
                 <td className="amount-cell">{inr(row.amount)}</td>
-                <td><b>{Math.max(0, row.days_overdue)} days</b></td>
-                <td>{Math.round(row.avg_delay_days)} days</td>
+                <td><b>{days(Math.max(0, row.days_overdue))}</b></td>
+                <td>{days(Math.round(row.avg_delay_days))}</td>
                 <td><span className={`status-pill ${priority[0]}`}>{priority[1]}</span></td>
               </tr>
             );
@@ -460,12 +476,12 @@ function Insights({ overview, forecast, summary, backtest }) {
       ? {
           tone: "warning",
           title: "Potential cash shortage",
-          body: `The conservative forecast may dip below the ₹50,000 safety buffer around ${fmtDate(forecast.alert.date)}. Estimated gap: ${inr(forecast.alert.gap)}.`,
+          body: `The conservative forecast may dip below the ${bufferText(forecast)} safety buffer around ${fmtDate(forecast.alert.date)}. Estimated gap: ${inr(forecast.alert.gap)}.`,
         }
       : {
           tone: "positive",
           title: "Cash buffer looks steady",
-          body: "The conservative forecast stays above the ₹50,000 safety buffer over the next 30 days.",
+          body: `The conservative forecast stays above the ${bufferText(forecast)} safety buffer over the next 30 days.`,
         },
     {
       tone: overdue.length ? "warning" : "positive",
@@ -712,6 +728,7 @@ export default function App() {
     else setCollapsed((value) => !value);
   }
 
+  const plan = closeGap(forecast.alert, forecast.chase);
   const cashAlert = forecast.alert
     ? `Cash buffer risk · ${fmtDate(forecast.alert.date)}`
     : "Cash forecast is above the safety buffer";
@@ -763,7 +780,7 @@ export default function App() {
               <Icon name="search" size={17} />
               <input ref={searchRef} type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search anything..." aria-label="Search transactions, invoices, and bills" />
               {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search">×</button>}
-              <kbd>⌘ K</kbd>
+              <kbd>Ctrl K</kbd>
             </label>
             {page !== "settings" && <DateFilter value={range} onChange={setRange} />}
             <div className="notification-wrap">
@@ -797,7 +814,6 @@ export default function App() {
               <span className="as-of">As of {fmtDate(asOf, { day: "numeric", month: "short", year: "numeric" })}</span>
             </div>
           </div>
-          <p className="prototype-note">Seeded prototype records are synthetic. Import your business CSVs in Settings before relying on these figures.</p>
 
           {(overviewError || forecastError) && (
             <div className="api-notice" role="status">
@@ -813,10 +829,10 @@ export default function App() {
             <>
               {page === "dashboard" && (
                 <>
-                  <Kpis overview={overview} forecast={forecast} summary={summary} rangeLabel={rangeLabel} />
+                  <Kpis overview={overview} forecast={forecast} summary={summary} rangeLabel={rangeLabel} lowest={forecast.min_p50} />
                   <div className={`forecast-banner ${forecast.alert ? "risk" : "healthy"}`}>
                     <span className="banner-icon"><Icon name={forecast.alert ? "bell" : "forecast"} /></span>
-                    <div><b>{forecast.alert ? "Cash flow needs attention" : "Your cash outlook is looking steady"}</b><p>{forecast.alert ? `Projected balance could fall below your safety buffer by ${fmtDate(forecast.alert.date)}. Estimated gap ${inr(forecast.alert.gap)}.` : "No balance dip below the ₹50,000 safety buffer is projected over the next 30 days."}</p></div>
+                    <div><b>{forecast.alert ? "Cash flow needs attention" : "Your cash outlook is looking steady"}</b><p>{forecast.alert ? `Projected balance could fall below your safety buffer by ${fmtDate(forecast.alert.date)}. Estimated gap ${inr(forecast.alert.gap)}.${plan ? ` Collecting ${plan.picks.map((r) => r.invoice_id).join(", ")} (${inr(plan.total)}) ${plan.covers ? "would cover it" : "would help close it"}.` : ""}` : `No balance dip below the ${bufferText(forecast)} safety buffer is projected over the next 30 days.`}</p></div>
                     <button type="button" onClick={() => navigate("forecast")}>View forecast <span>→</span></button>
                   </div>
                   <div className="dashboard-grid">
@@ -824,36 +840,10 @@ export default function App() {
                       <CardHeader title="Cash balance forecast" subtitle="Reconstructed history and 30-day projected range" action={<span className="chart-tag"><i />Expected balance</span>} />
                       <BalanceChart history={history} forecast={forecast} />
                     </section>
-                    <section className="card flow-card">
-                      <CardHeader title="Cash inflow vs outflow" subtitle={`${rangeLabel} actuals · next 30 days projected`} />
-                      <FlowChart history={history} forecast={forecast} />
+                    <section className="card compact-card">
+                      <CardHeader title="Upcoming bills" subtitle="Due in the next 45 days" action={<button className="text-link" type="button" onClick={() => navigate("bills")}>All bills →</button>} />
+                      <BillsList rows={bills.slice(0, 4)} />
                     </section>
-                  </div>
-                  <div className="dashboard-grid">
-                    <section className="card">
-                      <CardHeader title="Income vs expenses" subtitle="Monthly performance" action={<span className="subtle-label">Last {months.length} months</span>} />
-                      <MonthlyChart rows={months} />
-                    </section>
-                    <section className="card insights-card">
-                      <CardHeader title="Financial insights" subtitle="Highlights based on your current data" />
-                      <Insights overview={overview} forecast={forecast} summary={summary} backtest={backtest} />
-                    </section>
-                  </div>
-                  <div className="dashboard-grid lower-grid">
-                    <section className="card">
-                      <CardHeader title="Recent transactions" subtitle="Latest recorded activity" action={<button className="text-link" type="button" onClick={() => navigate("transactions")}>View all <span>→</span></button>} />
-                      <TransactionsTable rows={transactions.slice(0, 7)} empty={search ? "No transactions match your search." : "No transactions recorded for this period."} />
-                    </section>
-                    <div className="stacked-cards">
-                      <section className="card compact-card">
-                        <CardHeader title="Pending invoices" subtitle={`${overview.pending_invoices.length} open invoices`} action={<button className="text-link" type="button" onClick={() => navigate("invoices")}>All invoices →</button>} />
-                        <InvoiceTable rows={invoices.slice(0, 4)} />
-                      </section>
-                      <section className="card compact-card">
-                        <CardHeader title="Upcoming bills" subtitle="Due in the next 45 days" action={<button className="text-link" type="button" onClick={() => navigate("bills")}>All bills →</button>} />
-                        <BillsList rows={bills.slice(0, 4)} />
-                      </section>
-                    </div>
                   </div>
                   <section className="card chase-card">
                     <CardHeader

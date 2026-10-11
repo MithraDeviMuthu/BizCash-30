@@ -102,6 +102,7 @@ def simulate(data, runs=RUNS, extra_delay=0, delay_bill_id=None, seed=7):
         alert=alert, chase=chase.to_dict("records"),
         open_invoices=int(len(op)), open_amount=round(float(op["amount"].sum())),
         min_p50=round(float(p50.min())),
+        buffer=BUFFER,
     )
 
 
