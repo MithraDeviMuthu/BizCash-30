@@ -1,9 +1,0 @@
-"""Run: python backtest.py  -> sales forecast accuracy over several holdout windows."""
-import engine
-
-if __name__ == "__main__":
-    data = engine.load()
-    for n in (14, 30, 60):
-        r = engine.backtest(data, cut_back=n)
-        print(f"last {n:>2} days | MAE Rs {r['sales_mae']:>8,} | MAPE {r['sales_mape_pct']}%")
-        
