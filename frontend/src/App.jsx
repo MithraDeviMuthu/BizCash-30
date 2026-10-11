@@ -1,18 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Area,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ComposedChart,
-  Legend,
-  Line,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import Plotly from "plotly.js-basic-dist-min";
 
 const API = "";
 const RANGE_OPTIONS = [
@@ -196,130 +183,104 @@ function Icon({ name, size = 19 }) {
   );
 }
 
-function ChartTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="chart-tooltip">
-      <strong>{label}</strong>
-      {payload
-        .filter((item) => item.value != null)
-        .map((item) => (
-          <div key={item.dataKey || item.name}>
-            <span><i style={{ background: item.color || item.fill }} />{item.name}</span>
-            <b>{Array.isArray(item.value) ? item.value.map(inr).join(" – ") : inr(item.value)}</b>
-          </div>
-        ))}
-    </div>
-  );
-}
+const PLOT_AXIS = {
+  tickfont: { size: 11, color: "#8794a8" },
+  gridcolor: "#edf1f6",
+  linecolor: "rgba(0,0,0,0)",
+  zeroline: false,
+  fixedrange: true,
+};
+const moneyAxis = { ...PLOT_AXIS, tickprefix: "₹", tickformat: "~s", zeroline: true, zerolinecolor: "#cbd5e1" };
+const dateAxis = { ...PLOT_AXIS, type: "date", tickformat: "%-d %b", hoverformat: "%-d %b %Y", showgrid: false, nticks: 8 };
+const legendBelow = { orientation: "h", x: 0.5, xanchor: "center", y: -0.2, font: { size: 11, color: "#67768d" } };
+const dividerAt = (x) => ({ type: "line", xref: "x", x0: x, x1: x, yref: "paper", y0: 0, y1: 1, line: { color: "#a8b4c4", width: 1, dash: "dot" } });
 
-function ChartAxis({ dataKey = "label", interval = "preserveStartEnd" }) {
-  return (
-    <XAxis
-      dataKey={dataKey}
-      interval={interval}
-      minTickGap={22}
-      tick={{ fill: "#8794a8", fontSize: 11 }}
-      axisLine={false}
-      tickLine={false}
-      tickMargin={10}
-    />
-  );
+function PlotlyChart({ data, layout = {}, height = 280 }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    Plotly.react(
+      ref.current,
+      data,
+      {
+        height,
+        margin: { t: 10, r: 8, l: 50, b: layout.showlegend ? 55 : 30 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        font: { family: "inherit", size: 11, color: "#67768d" },
+        hovermode: "x unified",
+        showlegend: false,
+        ...layout,
+      },
+      { responsive: true, displayModeBar: false },
+    );
+  }, [data, layout, height]);
+  useEffect(() => {
+    const el = ref.current;
+    return () => Plotly.purge(el);
+  }, []);
+  return <div ref={ref} style={{ width: "100%" }} />;
 }
 
 function BalanceChart({ history, forecast }) {
-  const historic = history.slice(-30).map((row) => ({
-    label: fmtDate(row.date),
-    actual: row.balance,
-  }));
-  const predicted = forecast.dates.map((date, i) => ({
-    label: fmtDate(date),
-    expected: forecast.p50[i],
-    range: [forecast.p10[i], forecast.p90[i]],
-    conservative: forecast.p10[i],
-  }));
-  const data = [...historic, ...predicted];
+  const past = history.slice(-30);
+  const hover = (name) => `${name}: %{customdata}<extra></extra>`;
+  const line = (name, x, y, style) => ({
+    type: "scatter", mode: "lines", name, x, y, line: style, customdata: y.map(inr), hovertemplate: hover(name),
+  });
+  const data = [
+    { type: "scatter", mode: "lines", x: forecast.dates, y: forecast.p90, line: { width: 0 }, hoverinfo: "skip" },
+    { type: "scatter", mode: "lines", name: "Forecast range", x: forecast.dates, y: forecast.p10, line: { width: 0 }, fill: "tonexty", fillcolor: "rgba(91,167,247,0.2)", hoverinfo: "skip" },
+    line("Reconstructed balance", past.map((row) => row.date), past.map((row) => row.balance), { color: "#152f55", width: 2.5 }),
+    line("Expected balance", forecast.dates, forecast.p50, { color: "#3688e8", width: 2.5 }),
+    line("Conservative case", forecast.dates, forecast.p10, { color: "#e49b42", width: 1.6, dash: "dash" }),
+  ];
+  const layout = { xaxis: dateAxis, yaxis: moneyAxis, shapes: past.length ? [dividerAt(past[past.length - 1].date)] : [] };
 
   return (
     <div className="chart-canvas">
-      <ResponsiveContainer width="100%" height={310}>
-        <ComposedChart data={data} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="forecastBand" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#5ba7f7" stopOpacity={0.23} />
-              <stop offset="100%" stopColor="#5ba7f7" stopOpacity={0.025} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid stroke="#edf1f6" vertical={false} />
-          <ChartAxis />
-          <YAxis
-            tickFormatter={inrK}
-            tick={{ fill: "#8794a8", fontSize: 11 }}
-            axisLine={false}
-            tickLine={false}
-            width={50}
-          />
-          <Tooltip content={<ChartTooltip />} />
-          <ReferenceLine x={historic[historic.length - 1]?.label} stroke="#a8b4c4" strokeDasharray="4 4" />
-          <ReferenceLine y={0} stroke="#cbd5e1" />
-          <Area dataKey="range" name="Forecast range" stroke="none" fill="url(#forecastBand)" />
-          <Line dataKey="actual" name="Reconstructed balance" stroke="#152f55" strokeWidth={2.5} dot={false} connectNulls />
-          <Line dataKey="expected" name="Expected balance" stroke="#3688e8" strokeWidth={2.5} dot={false} connectNulls />
-          <Line dataKey="conservative" name="Conservative case" stroke="#e49b42" strokeWidth={1.6} strokeDasharray="5 4" dot={false} />
-        </ComposedChart>
-      </ResponsiveContainer>
+      <PlotlyChart data={data} layout={layout} height={310} />
       <div className="chart-period-labels"><span>Reconstructed history</span><span>Forecast · next 30 days</span></div>
     </div>
   );
 }
 
 function FlowChart({ history, forecast }) {
-  const actual = history.map((row) => ({
-    label: fmtDate(row.date),
-    income: row.income,
-    expenses: row.expenses,
-  }));
-  const projected = forecast.dates.map((date, i) => ({
-    label: fmtDate(date),
-    projectedIncome: forecast.inflows?.[i] ?? 0,
-    projectedExpenses: forecast.outflows?.[i] ?? 0,
-  }));
-
-  return (
-    <ResponsiveContainer width="100%" height={270}>
-      <BarChart data={[...actual, ...projected]} margin={{ top: 10, right: 8, left: 0, bottom: 0 }} barGap={2}>
-        <CartesianGrid stroke="#edf1f6" vertical={false} />
-        <ChartAxis />
-        <YAxis tickFormatter={inrK} tick={{ fill: "#8794a8", fontSize: 11 }} axisLine={false} tickLine={false} width={50} />
-        <Tooltip content={<ChartTooltip />} />
-        <Legend iconType="circle" wrapperStyle={{ fontSize: 11, color: "#67768d", paddingTop: 10 }} />
-        <Bar dataKey="income" name="Income" fill="#3988e8" radius={[3, 3, 0, 0]} maxBarSize={14} />
-        <Bar dataKey="expenses" name="Expenses" fill="#aab8ca" radius={[3, 3, 0, 0]} maxBarSize={14} />
-        <Bar dataKey="projectedIncome" name="Expected inflow" fill="#93c5fd" radius={[3, 3, 0, 0]} maxBarSize={14} />
-        <Bar dataKey="projectedExpenses" name="Expected outflow" fill="#d8e0e9" radius={[3, 3, 0, 0]} maxBarSize={14} />
-      </BarChart>
-    </ResponsiveContainer>
-  );
+  const nPast = history.length;
+  const dates = [...history.map((row) => row.date), ...forecast.dates];
+  const income = [...history.map((row) => row.income), ...forecast.dates.map((_, i) => forecast.inflows?.[i] ?? 0)];
+  const expenses = [...history.map((row) => row.expenses), ...forecast.dates.map((_, i) => forecast.outflows?.[i] ?? 0)];
+  const bars = (name, projectedName, values, actual, projected) => ({
+    type: "bar",
+    name,
+    x: dates,
+    y: values,
+    marker: { color: dates.map((_, i) => (i < nPast ? actual : projected)) },
+    customdata: values.map((v, i) => [i < nPast ? name : projectedName, inr(v)]),
+    hovertemplate: "%{customdata[0]}: %{customdata[1]}<extra></extra>",
+  });
+  const data = [
+    bars("Income", "Expected inflow", income, "#3988e8", "#93c5fd"),
+    bars("Expenses", "Expected outflow", expenses, "#aab8ca", "#d8e0e9"),
+  ];
+  const layout = {
+    xaxis: dateAxis, yaxis: moneyAxis, barmode: "group", bargap: 0.25, showlegend: true, legend: legendBelow,
+    shapes: nPast ? [dividerAt(history[nPast - 1].date)] : [],
+  };
+  return <PlotlyChart data={data} layout={layout} height={270} />;
 }
 
 function MonthlyChart({ rows }) {
-  const data = rows.map((row) => ({
-    ...row,
-    label: new Intl.DateTimeFormat("en-IN", { month: "short" }).format(new Date(`${row.month}-15T12:00:00`)),
-  }));
-  return (
-    <ResponsiveContainer width="100%" height={265}>
-      <BarChart data={data} margin={{ top: 10, right: 8, left: 0, bottom: 0 }} barGap={5}>
-        <CartesianGrid stroke="#edf1f6" vertical={false} />
-        <ChartAxis />
-        <YAxis tickFormatter={inrK} tick={{ fill: "#8794a8", fontSize: 11 }} axisLine={false} tickLine={false} width={50} />
-        <Tooltip content={<ChartTooltip />} />
-        <Legend iconType="circle" wrapperStyle={{ fontSize: 11, color: "#67768d", paddingTop: 10 }} />
-        <Bar dataKey="income" name="Income" fill="#3988e8" radius={[4, 4, 0, 0]} maxBarSize={28} />
-        <Bar dataKey="expenses" name="Expenses" fill="#aab8ca" radius={[4, 4, 0, 0]} maxBarSize={28} />
-      </BarChart>
-    </ResponsiveContainer>
-  );
+  const labels = rows.map((row) => new Intl.DateTimeFormat("en-IN", { month: "short" }).format(new Date(`${row.month}-15T12:00:00`)));
+  const bars = (name, key, color) => ({
+    type: "bar", name, x: labels, y: rows.map((row) => row[key]), marker: { color },
+    customdata: rows.map((row) => inr(row[key])), hovertemplate: `${name}: %{customdata}<extra></extra>`,
+  });
+  const data = [bars("Income", "income", "#3988e8"), bars("Expenses", "expenses", "#aab8ca")];
+  const layout = {
+    xaxis: { ...PLOT_AXIS, type: "category", showgrid: false }, yaxis: moneyAxis,
+    barmode: "group", bargap: 0.35, showlegend: true, legend: legendBelow,
+  };
+  return <PlotlyChart data={data} layout={layout} height={265} />;
 }
 
 function DateFilter({ value, onChange }) {
@@ -888,7 +849,7 @@ export default function App() {
               {page === "forecast" && (
                 <>
                   <section className="card forecast-detail">
-                    <CardHeader title="30-day cash balance forecast" subtitle="Reconstructed cash history and 10th–90th percentile forecast range" action={<span className="forecast-method">300-run Monte Carlo</span>} />
+                    <CardHeader title="30-day cash balance forecast" subtitle="Reconstructed cash history and 10th–90th percentile forecast range" action={<><span className="forecast-method">300-run Monte Carlo</span> <a className="text-link" href={`/api/chart/forecast?extra_delay=${extraDelay}`} target="_blank" rel="noreferrer">Open Plotly chart ↗</a></>} />
                     {forecast.alert && <div className="forecast-inline-alert"><Icon name="bell" size={17} /><span>Potential buffer breach on <b>{fmtDate(forecast.alert.date)}</b> · estimated gap {inr(forecast.alert.gap)}</span></div>}
                     <BalanceChart history={history} forecast={forecast} />
                   </section>

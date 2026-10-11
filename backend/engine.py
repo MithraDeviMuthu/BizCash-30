@@ -25,11 +25,28 @@ def customer_delays(inv):
     return g
 
 
-def sales_model(sales):
-    """Day-of-week average over the last 12 weeks + residual std."""
+ALPHA, BETA, PHI = 0.3, 0.1, 0.9  # damped-trend smoothing: level, trend, damping
+
+
+def sales_forecast(sales, dates):
+    """Weekday-seasonal damped trend: divide out the weekday pattern (last 12 weeks), run Holt's
+    damped trend on what is left, then put the weekday pattern back. Returns (daily forecast, noise std)."""
     s = sales.tail(84).copy()
     s["dow"] = s["date"].dt.dayofweek
-    return s.groupby("dow")["amount"].mean(), s["amount"].std() * 0.6
+    season = s.groupby("dow")["amount"].mean()
+    season = season / season.mean()                          # weekday index, 1.0 = average day
+    idx = s["dow"].map(season).to_numpy(float)
+    open_days = idx > 0                                      # skip always-closed weekdays (they forecast 0)
+    y = s["amount"].to_numpy(float)[open_days] / idx[open_days]  # deseasonalised sales
+    level, trend = y[0], 0.0
+    for v in y[1:]:
+        prev = level
+        level = ALPHA * v + (1 - ALPHA) * (prev + PHI * trend)
+        trend = BETA * (level - prev) + (1 - BETA) * PHI * trend
+    steps = np.arange(1, len(dates) + 1)
+    base = level + trend * np.cumsum(PHI ** steps)           # damped: the trend fades out
+    dows = pd.DatetimeIndex(dates).dayofweek
+    return base * season.reindex(dows).fillna(1.0).to_numpy(), s["amount"].std() * 0.6
 
 
 def simulate(data, runs=RUNS, extra_delay=0, delay_bill_id=None, seed=7):
@@ -38,7 +55,7 @@ def simulate(data, runs=RUNS, extra_delay=0, delay_bill_id=None, seed=7):
     today = data["sales"]["date"].max()
     dates = pd.date_range(today + pd.Timedelta(days=1), periods=HORIZON)
     delays = customer_delays(data["inv"])
-    dow_mean, sales_sd = sales_model(data["sales"])
+    sales_in, sales_sd = sales_forecast(data["sales"], dates)
 
     # open invoices
     op = data["inv"][data["inv"]["paid_date"].isna()].copy()
@@ -56,7 +73,6 @@ def simulate(data, runs=RUNS, extra_delay=0, delay_bill_id=None, seed=7):
 
     # simulation
     bal = np.zeros((runs, HORIZON))
-    sales_in = np.array([dow_mean[d.dayofweek] for d in dates])
     for r in range(runs):
         cash_in = sales_in + rng.normal(0, sales_sd, HORIZON)
         for _, row in op.iterrows():
@@ -107,13 +123,20 @@ def simulate(data, runs=RUNS, extra_delay=0, delay_bill_id=None, seed=7):
 
 
 def backtest(data, cut_back=30):
-    """Train on data up to N days ago, forecast the last N days, compare with actuals (sales-only MAE)."""
+    """Train on data up to N days ago, forecast the last N days, compare with actuals (sales only).
+    Compares the damped-trend model with a plain weekday-average baseline."""
     s = data["sales"]
-    train, test = s.iloc[:-cut_back], s.iloc[-cut_back:].copy()
-    m, _ = sales_model(train)
-    test["pred"] = test["date"].dt.dayofweek.map(m)
-    mae = float((test["amount"] - test["pred"]).abs().mean())
-    return dict(sales_mae=round(mae), sales_mape_pct=round(100 * mae / float(test["amount"].mean()), 1))
+    train, test = s.iloc[:-cut_back], s.iloc[-cut_back:]
+    actual = test["amount"].to_numpy(float)
+    pred, _ = sales_forecast(train, test["date"])
+    recent = train.tail(84)
+    wk = recent.groupby(recent["date"].dt.dayofweek)["amount"].mean()
+    base = test["date"].dt.dayofweek.map(wk).to_numpy(float)
+    mae, base_mae = float(np.abs(actual - pred).mean()), float(np.abs(actual - base).mean())
+    return dict(
+        sales_mae=round(mae), sales_mape_pct=round(float(100 * mae / actual.mean()), 1),
+        baseline_mae=round(base_mae), baseline_mape_pct=round(float(100 * base_mae / actual.mean()), 1),
+    )
 
 
 def overview(data):
