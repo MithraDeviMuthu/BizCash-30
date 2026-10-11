@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Plotly from "plotly.js-basic-dist-min";
 
 const API = "";
+const RUNS = 2000; // Monte Carlo simulations per forecast
 const RANGE_OPTIONS = [
   { days: 30, label: "Last 30 days" },
   { days: 90, label: "Last 90 days" },
   { days: 180, label: "Last 6 months" },
+  { days: 365, label: "Last 12 months" },
 ];
 
 const NAV = [
@@ -648,7 +650,7 @@ export default function App() {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    getJson(`/api/forecast?extra_delay=${extraDelay}&runs=300`)
+    getJson(`/api/forecast?extra_delay=${extraDelay}&runs=${RUNS}`)
       .then((data) => {
         if (!active) return;
         setForecast(data);
@@ -870,7 +872,7 @@ export default function App() {
               {page === "forecast" && (
                 <>
                   <section className="card forecast-detail">
-                    <CardHeader title="30-day cash balance forecast" subtitle="Reconstructed cash history and 10th–90th percentile forecast range" action={<><span className="forecast-method">300-run Monte Carlo</span> <a className="text-link" href={`/api/chart/forecast?extra_delay=${extraDelay}`} target="_blank" rel="noreferrer">Open Plotly chart ↗</a></>} />
+                    <CardHeader title="30-day cash balance forecast" subtitle="Reconstructed cash history and 10th–90th percentile forecast range" action={<><span className="forecast-method">{RUNS.toLocaleString("en-IN")}-run Monte Carlo</span> <a className="text-link" href={`/api/chart/forecast?extra_delay=${extraDelay}`} target="_blank" rel="noreferrer">Open Plotly chart ↗</a></>} />
                     {forecast.alert && <div className="forecast-inline-alert"><Icon name="bell" size={17} /><span>Potential buffer breach on <b>{fmtDate(forecast.alert.date)}</b> · estimated gap {inr(forecast.alert.gap)}</span></div>}
                     <BalanceChart history={history} forecast={forecast} />
                   </section>
