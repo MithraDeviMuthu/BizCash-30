@@ -7,7 +7,7 @@
 ![Python](https://img.shields.io/badge/Python-3-3776AB?logo=python&logoColor=white&labelColor=1a1a1a)
 ![Plotly](https://img.shields.io/badge/Plotly-Charts-3F4F75?logo=plotly&logoColor=white&labelColor=1a1a1a)
 ![Matplotlib](https://img.shields.io/badge/Matplotlib-Charts-11557C?labelColor=1a1a1a)
-
+![License](https://img.shields.io/badge/License-MIT-yellow?labelColor=1a1a1a)
 
 📈 Forecast cash. ⚠️ Catch shortfalls early. 📞 Chase the right customers first.
 
