@@ -2,7 +2,7 @@ import numpy as np, pandas as pd
 from pathlib import Path
 
 D = Path(__file__).parent / "data"
-HORIZON, RUNS, BUFFER = 30, 1000, 50000  # BUFFER = minimum safe cash (Rs)
+HORIZON, RUNS, BUFFER = 30, 2000, 50000  # BUFFER = minimum safe cash (Rs)
 
 
 def load():
@@ -71,17 +71,14 @@ def simulate(data, runs=RUNS, extra_delay=0, delay_bill_id=None, seed=7):
         out[i] += b.loc[b["due_date"] == d, "amount"].sum()
     out += data["exp"]["amount"].tail(60).mean()
 
-    # simulation
-    bal = np.zeros((runs, HORIZON))
-    for r in range(runs):
-        cash_in = sales_in + rng.normal(0, sales_sd, HORIZON)
-        for _, row in op.iterrows():
-            pay = row["due_date"] + pd.Timedelta(days=int(rng.normal(row["mean"] + extra_delay, row["std"])))
-            pay = max(pay, today + pd.Timedelta(days=1))          # unpaid invoices can't be paid in the past
-            k = (pay - dates[0]).days
-            if 0 <= k < HORIZON:
-                cash_in[k] += row["amount"]
-        bal[r] = data["opening"] + np.cumsum(cash_in - out)
+    # simulation (vectorized: all runs at once)
+    cash_in = sales_in + rng.normal(0, sales_sd, (runs, HORIZON))
+    for _, row in op.iterrows():
+        delay = rng.normal(row["mean"] + extra_delay, row["std"], runs).astype(int)
+        k = np.maximum((row["due_date"] - dates[0]).days + delay, 0)   # can't be paid in the past
+        ok = k < HORIZON
+        cash_in[np.arange(runs)[ok], k[ok]] += row["amount"]
+    bal = data["opening"] + np.cumsum(cash_in - out, axis=1)
     # opening = current cash in hand today
     p10, p50, p90 = np.percentile(bal, [10, 50, 90], axis=0)
 
