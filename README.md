@@ -3,10 +3,10 @@
 **Know your cash 30 days ahead — before a shortfall surprises you.**
 
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white&labelColor=20232A)
-![Vite](https://img.shields.io/badge/Vite-Frontend-646CFF?logo=vite&logoColor=white&labelColor=1a1a1a)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white&labelColor=1a1a1a)
 ![Python](https://img.shields.io/badge/Python-3-3776AB?logo=python&logoColor=white&labelColor=1a1a1a)
-
+![Plotly](https://img.shields.io/badge/Plotly-Charts-3F4F75?logo=plotly&logoColor=white&labelColor=1a1a1a)
+![Matplotlib](https://img.shields.io/badge/Matplotlib-Charts-11557C?labelColor=1a1a1a)
 
 📈 Forecast cash. ⚠️ Catch shortfalls early. 📞 Chase the right customers first.
 
@@ -23,9 +23,26 @@
 | 🚨 | **Shortfall alerts** | Warns when projected cash drops below a safe buffer |
 | 📞 | **Collections queue** | Ranks which customers to chase first, based on learned payment behavior |
 | 🧾 | **Invoices & bills** | Open invoices, upcoming bills and searchable transactions |
+| 📉 | **Damped-trend sales forecast** | Weekday-seasonal damped trend, backtested against a plain weekday average |
 | 🔎 | **Backtesting** | Check forecast accuracy against past data |
+| 📊 | **Plotly & Matplotlib charts** | Interactive Plotly forecast chart and static Matplotlib PNG |
 | 📥 | **CSV import** | Upload your own data from Settings |
+| ✅ | **Upload validation** | Checks columns, dates and amounts before a CSV is accepted |
+| 💡 | **Shortfall advice** | Suggests which invoices to collect to close a projected gap |
 | 🛟 | **Sample-data fallback** | Clearly labeled sample data if the API is offline |
+
+---
+
+## 🛠️ Tech stack
+
+| Layer | Technology |
+|-------|------------|
+| 🎨 Frontend | React 18, HTML, CSS, JavaScript |
+| ⚙️ Backend | Python 3, FastAPI, Uvicorn, pandas, NumPy |
+| 📊 Charts | Plotly (dashboard and interactive chart), Matplotlib (static PNG) |
+| 🗄️ Data | CSV files (database planned) |
+| 🧠 Models | Monte Carlo simulation, weekday-seasonal damped trend, per-customer payment-delay model |
+| 🧪 Testing | pytest |
 
 ---
 
@@ -49,7 +66,7 @@
 
 1. 📤 Sales, invoices, bills, expenses and balance data are loaded from CSVs
 2. 🧠 The engine learns how each customer pays (typical delays)
-3. 📈 Daily sales are forecast from history
+3. 📈 Daily sales are forecast with a weekday-seasonal damped trend
 4. 🎲 Monte Carlo simulation runs many possible 30-day cash paths
 5. 🚨 Paths are compared to the safe-cash buffer to raise shortfall alerts
 6. 📞 Open invoices are ranked to show who to chase first
@@ -82,6 +99,18 @@ npm run dev
 
 ---
 
+## 🧪 Tests & backtest
+
+```bash
+cd backend
+pip install pytest
+python -m pytest tests -q    # unit tests for forecast, alerts, ranking, validation
+python backtest.py           # damped trend vs weekday-average baseline, 14 / 30 / 60 days
+python charts.py             # saves a Matplotlib PNG to docs/images/
+```
+
+---
+
 ## 🗂️ Using your own data
 
 Copy your sales file to `backend/data/sales_raw.csv` (Rossmann `train.csv`, or any CSV with `Date` and `Sales` columns), then run `python make_data.py` again.
@@ -96,8 +125,9 @@ Copy your sales file to `backend/data/sales_raw.csv` (Rossmann `train.csv`, or a
 |----------|---------|
 | `GET /api/overview` | Summary, 365-day income/expense history, recent activity |
 | `GET /api/forecast` | 30-day forecast and scenarios |
+| `GET /api/chart/forecast` | Interactive Plotly forecast chart (HTML) |
 | `GET /api/backtest` | Forecast accuracy against past data |
-| `POST /api/upload/{table}` | Upload a CSV to replace a data table |
+| `POST /api/upload/{table}` | Validate and upload a CSV to replace a data table (returns 400 with the reason if invalid) |
 
 ---
 
@@ -107,7 +137,7 @@ Tunables in `backend/engine.py`:
 
 | Constant | Meaning |
 |----------|---------|
-| `BUFFER` | Minimum safe cash level |
+| `BUFFER` | Minimum safe cash level (also shown on the dashboard) |
 | `RUNS` | Number of simulations |
 | `HORIZON` | Forecast length in days (30) |
 
@@ -121,6 +151,10 @@ BizCash-30/
 │   ├── main.py          # FastAPI app
 │   ├── engine.py        # forecasting, Monte Carlo, alerts, backtest
 │   ├── make_data.py     # builds the 5 CSVs
+│   ├── charts.py        # Plotly + Matplotlib charts
+│   ├── validate.py      # CSV upload validation
+│   ├── backtest.py      # forecast accuracy report
+│   ├── tests/           # pytest tests
 │   └── data/
 ├── frontend/
 │   └── src/
