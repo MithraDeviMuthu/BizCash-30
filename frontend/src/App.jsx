@@ -54,11 +54,11 @@ const sum = (rows, key) => rows.reduce((total, row) => total + (Number(row[key])
 function makeDemoOverview() {
   const today = dateKey(new Date());
   const history = [];
-  const start = shiftDate(today, -179);
+  const start = shiftDate(today, -364);
 
-  for (let i = 0; i < 180; i += 1) {
+  for (let i = 0; i < 365; i += 1) {
     const date = shiftDate(start, i);
-    const isRecent = i >= 150;
+    const isRecent = i >= 335;
     const income = isRecent
       ? Math.round(412800 / 30) + (i % 4 === 0 ? 140 : 0)
       : 11700 + ((i * 137) % 2300);
@@ -115,7 +115,7 @@ function makeDemoOverview() {
       { vendor: "Payroll", type: "Payroll", amount: 190000, due_date: shiftDate(today, 20) },
       { vendor: "Landlord", type: "Rent", amount: 60000, due_date: shiftDate(today, 22) },
     ],
-    monthly: [...monthMap.values()].slice(-6).map((row) => ({
+    monthly: [...monthMap.values()].slice(-12).map((row) => ({
       ...row,
       income: Math.round(row.income),
       expenses: Math.round(row.expenses),
@@ -686,7 +686,24 @@ export default function App() {
   const invoices = (overview.pending_invoices || []).filter(matchesSearch);
   const bills = (overview.upcoming_bills || []).filter(matchesSearch);
   const chase = (forecast.chase || []).filter(matchesSearch);
-  const months = (overview.monthly || []).slice(-Math.ceil(range / 30));
+
+  // Build the monthly chart from the daily records selected by the date range.
+  // This allows the chart to show 12 months when the API provides a full year.
+  const monthlyMap = new Map();
+  history.forEach((row) => {
+    const month = row.date.slice(0, 7);
+    const current = monthlyMap.get(month) || { month, income: 0, expenses: 0 };
+    current.income += Number(row.income) || 0;
+    current.expenses += Number(row.expenses) || 0;
+    monthlyMap.set(month, current);
+  });
+  const monthsToShow = range === 365 ? 12 : Math.ceil(range / 30);
+  const months = [...monthlyMap.values()].slice(-monthsToShow).map((row) => ({
+    ...row,
+    income: Math.round(row.income),
+    expenses: Math.round(row.expenses),
+  }));
+
   const overdueCount = (overview.pending_invoices || []).filter((row) => row.days_overdue > 0).length;
   const hasSampleData = !overviewConnected || !forecastConnected;
   const subtitle = {
@@ -792,9 +809,9 @@ export default function App() {
           <div className="content-heading">
             <div><h2>{page === "dashboard" ? "Good to see you" : navItem.label}</h2><p>{subtitle}</p></div>
             <div className="content-meta">
-                      {hasSampleData
+              {hasSampleData
                 ? <span className="data-badge sample"><i />Sample data</span>
-                        : <span className="data-badge connected"><i />API connected · prototype dataset</span>}
+                : <span className="data-badge connected"><i />API connected · prototype dataset</span>}
               <span className="as-of">As of {fmtDate(asOf, { day: "numeric", month: "short", year: "numeric" })}</span>
             </div>
           </div>
