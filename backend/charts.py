@@ -1,8 +1,5 @@
 """Plotly (interactive) and Matplotlib (static PNG) views of the 30-day forecast.
 Run: python charts.py  -> saves ../docs/images/forecast-matplotlib.png"""
-import matplotlib
-matplotlib.use("Agg")  # no window needed, just save files
-import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 
 
@@ -21,6 +18,10 @@ def plotly_forecast(r):
 
 def matplotlib_forecast(r, path):
     """Static PNG of the same forecast (for the README / reports)."""
+    import matplotlib
+    matplotlib.use("Agg")  # no window needed, just save files
+    import matplotlib.pyplot as plt
+
     fig, ax = plt.subplots(figsize=(10, 4.5))
     ax.fill_between(r["dates"], r["p10"], r["p90"], alpha=0.2, label="10th-90th percentile")
     ax.plot(r["dates"], r["p50"], lw=2.5, label="Expected")
