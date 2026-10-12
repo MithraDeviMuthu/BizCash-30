@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Plotly from "plotly.js-basic-dist-min";
 
-const API = "";
+const API = import.meta.env.PROD ? "https://bizcash-30.onrender.com" : "";
 const RUNS = 2000; // Monte Carlo simulations per forecast
 const RANGE_OPTIONS = [
   { days: 30, label: "Last 30 days" },
