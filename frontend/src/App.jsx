@@ -224,7 +224,7 @@ function PlotlyChart({ data, layout = {}, height = 280 }) {
 }
 
 function BalanceChart({ history, forecast }) {
-  const past = history.slice(-30);
+  const past = history;
   const hover = (name) => `${name}: %{customdata}<extra></extra>`;
   const line = (name, x, y, style) => ({
     type: "scatter", mode: "lines", name, x, y, line: style, customdata: y.map(inr), hovertemplate: hover(name),
