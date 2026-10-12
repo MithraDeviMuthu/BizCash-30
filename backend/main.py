@@ -9,6 +9,11 @@ app = FastAPI(title="BizCash 30")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
+@app.get("/")
+def root():
+    return {"status": "ok", "app": "BizCash API"}
+
+
 @app.get("/api/forecast")
 def forecast(extra_delay: int = 0, runs: int = 500):
     """extra_delay = what-if: every customer pays N days later than usual."""
