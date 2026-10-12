@@ -49,15 +49,15 @@
 
 ## 🖼️ Screenshots
 
-### 🏠 Dashboard
+                                ### 🏠 Dashboard
 
 ![Dashboard](docs/images/dashboard.png)
 
-### 📈 Forecast
+                                ### 📈 Forecast
 
 ![Forecast](docs/images/forecast.png)
 
-### 📞 Collections
+                                ### 📞 Collections
 
 ![Collections](docs/images/collections.png)
 
