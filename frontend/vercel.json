@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://bizcash-30.onrender.com/api/:path*" }
+  ]
+}
