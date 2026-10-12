@@ -19,6 +19,7 @@ const RANGE_OPTIONS = [
   { days: 30, label: "Last 30 days" },
   { days: 90, label: "Last 90 days" },
   { days: 180, label: "Last 6 months" },
+  { days: 365, label: "Last 12 months" },
 ];
 
 const NAV = [
