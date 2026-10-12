@@ -1,20 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Area,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ComposedChart,
-  Legend,
-  Line,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import Plotly from "plotly.js-basic-dist-min";
 
-const API = "https://bizcash-30.onrender.com";
+const API = "";
+const RUNS = 2000; // Monte Carlo simulations per forecast
 const RANGE_OPTIONS = [
   { days: 30, label: "Last 30 days" },
   { days: 90, label: "Last 90 days" },
@@ -22,8 +10,8 @@ const RANGE_OPTIONS = [
   { days: 365, label: "Last 12 months" },
 ];
 
-const NAV = [
-  { id: "dashboard", label: "Dashboard", icon: "dashboard", hint: "Overview" },
+  { id: "dashboard", label: "Dashboard", icon: "da
+const NAV = [shboard", hint: "Overview" },
   { id: "cashflow", label: "Cash Flow", icon: "cashflow", hint: "In & out" },
   { id: "transactions", label: "Transactions", icon: "transactions", hint: "Recent activity" },
   { id: "invoices", label: "Invoices", icon: "invoices", hint: "Receivables" },
@@ -48,16 +36,29 @@ const fmtDate = (value, options = { day: "numeric", month: "short" }) => {
 };
 const inr = (value) => `₹${Math.round(Number(value) || 0).toLocaleString("en-IN")}`;
 const inrK = (value) => `₹${Math.round((Number(value) || 0) / 1000)}k`;
+const days = (n) => `${n} ${n === 1 ? "day" : "days"}`;
+const closeGap = (alert, chase = []) => {
+  if (!alert || !chase.length) return null;
+  const picks = [];
+  let total = 0;
+  for (const row of chase) {
+    if (picks.length === 3 || total >= alert.gap) break;
+    picks.push(row);
+    total += Number(row.amount) || 0;
+  }
+  return { picks, total, covers: total >= alert.gap };
+};
+const bufferText = (f) => inr(f?.buffer ?? 50000);
 const sum = (rows, key) => rows.reduce((total, row) => total + (Number(row[key]) || 0), 0);
 
 function makeDemoOverview() {
   const today = dateKey(new Date());
   const history = [];
-  const start = shiftDate(today, -179);
+  const start = shiftDate(today, -364);
 
-  for (let i = 0; i < 180; i += 1) {
+  for (let i = 0; i < 365; i += 1) {
     const date = shiftDate(start, i);
-    const isRecent = i >= 150;
+    const isRecent = i >= 335;
     const income = isRecent
       ? Math.round(412800 / 30) + (i % 4 === 0 ? 140 : 0)
       : 11700 + ((i * 137) % 2300);
@@ -114,7 +115,7 @@ function makeDemoOverview() {
       { vendor: "Payroll", type: "Payroll", amount: 190000, due_date: shiftDate(today, 20) },
       { vendor: "Landlord", type: "Rent", amount: 60000, due_date: shiftDate(today, 22) },
     ],
-    monthly: [...monthMap.values()].slice(-6).map((row) => ({
+    monthly: [...monthMap.values()].slice(-12).map((row) => ({
       ...row,
       income: Math.round(row.income),
       expenses: Math.round(row.expenses),
@@ -141,6 +142,7 @@ const DEMO_FORECAST = {
   open_invoices: 12,
   open_amount: 186400,
   min_p50: 21400,
+  buffer: 50000,
 };
 
 function Icon({ name, size = 19 }) {
@@ -183,130 +185,104 @@ function Icon({ name, size = 19 }) {
   );
 }
 
-function ChartTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="chart-tooltip">
-      <strong>{label}</strong>
-      {payload
-        .filter((item) => item.value != null)
-        .map((item) => (
-          <div key={item.dataKey || item.name}>
-            <span><i style={{ background: item.color || item.fill }} />{item.name}</span>
-            <b>{Array.isArray(item.value) ? item.value.map(inr).join(" – ") : inr(item.value)}</b>
-          </div>
-        ))}
-    </div>
-  );
-}
+const PLOT_AXIS = {
+  tickfont: { size: 11, color: "#667085" },
+  gridcolor: "#eef0f3",
+  linecolor: "rgba(0,0,0,0)",
+  zeroline: false,
+  fixedrange: true,
+};
+const moneyAxis = { ...PLOT_AXIS, tickprefix: "₹", tickformat: "~s", zeroline: true, zerolinecolor: "#d0d5dd" };
+const dateAxis = { ...PLOT_AXIS, type: "date", tickformat: "%-d %b", hoverformat: "%-d %b %Y", showgrid: false, nticks: 8 };
+const legendBelow = { orientation: "h", x: 0.5, xanchor: "center", y: -0.2, font: { size: 11, color: "#667085" } };
+const dividerAt = (x) => ({ type: "line", xref: "x", x0: x, x1: x, yref: "paper", y0: 0, y1: 1, line: { color: "#98a2b3", width: 1, dash: "dot" } });
 
-function ChartAxis({ dataKey = "label", interval = "preserveStartEnd" }) {
-  return (
-    <XAxis
-      dataKey={dataKey}
-      interval={interval}
-      minTickGap={22}
-      tick={{ fill: "#8794a8", fontSize: 11 }}
-      axisLine={false}
-      tickLine={false}
-      tickMargin={10}
-    />
-  );
+function PlotlyChart({ data, layout = {}, height = 280 }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    Plotly.react(
+      ref.current,
+      data,
+      {
+        height,
+        margin: { t: 10, r: 8, l: 50, b: layout.showlegend ? 55 : 30 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        font: { family: "inherit", size: 11, color: "#667085" },
+        hovermode: "x unified",
+        showlegend: false,
+        ...layout,
+      },
+      { responsive: true, displayModeBar: false },
+    );
+  }, [data, layout, height]);
+  useEffect(() => {
+    const el = ref.current;
+    return () => Plotly.purge(el);
+  }, []);
+  return <div ref={ref} style={{ width: "100%" }} />;
 }
 
 function BalanceChart({ history, forecast }) {
-  const historic = history.slice(-30).map((row) => ({
-    label: fmtDate(row.date),
-    actual: row.balance,
-  }));
-  const predicted = forecast.dates.map((date, i) => ({
-    label: fmtDate(date),
-    expected: forecast.p50[i],
-    range: [forecast.p10[i], forecast.p90[i]],
-    conservative: forecast.p10[i],
-  }));
-  const data = [...historic, ...predicted];
+  const past = history;
+  const hover = (name) => `${name}: %{customdata}<extra></extra>`;
+  const line = (name, x, y, style) => ({
+    type: "scatter", mode: "lines", name, x, y, line: style, customdata: y.map(inr), hovertemplate: hover(name),
+  });
+  const data = [
+    { type: "scatter", mode: "lines", x: forecast.dates, y: forecast.p90, line: { width: 0 }, hoverinfo: "skip" },
+    { type: "scatter", mode: "lines", name: "Forecast range", x: forecast.dates, y: forecast.p10, line: { width: 0 }, fill: "tonexty", fillcolor: "rgba(99, 102, 241, 0.13)", hoverinfo: "skip" },
+    line("Reconstructed balance", past.map((row) => row.date), past.map((row) => row.balance), { color: "#344054", width: 2.5 }),
+    line("Expected balance", forecast.dates, forecast.p50, { color: "#3b82f6", width: 2.7 }),
+    line("Conservative case", forecast.dates, forecast.p10, { color: "#f59e0b", width: 1.8, dash: "dash" }),
+  ];
+  const layout = { xaxis: dateAxis, yaxis: moneyAxis, shapes: past.length ? [dividerAt(past[past.length - 1].date)] : [] };
 
   return (
     <div className="chart-canvas">
-      <ResponsiveContainer width="100%" height={310}>
-        <ComposedChart data={data} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="forecastBand" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#5ba7f7" stopOpacity={0.23} />
-              <stop offset="100%" stopColor="#5ba7f7" stopOpacity={0.025} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid stroke="#edf1f6" vertical={false} />
-          <ChartAxis />
-          <YAxis
-            tickFormatter={inrK}
-            tick={{ fill: "#8794a8", fontSize: 11 }}
-            axisLine={false}
-            tickLine={false}
-            width={50}
-          />
-          <Tooltip content={<ChartTooltip />} />
-          <ReferenceLine x={historic[historic.length - 1]?.label} stroke="#a8b4c4" strokeDasharray="4 4" />
-          <ReferenceLine y={0} stroke="#cbd5e1" />
-          <Area dataKey="range" name="Forecast range" stroke="none" fill="url(#forecastBand)" />
-          <Line dataKey="actual" name="Reconstructed balance" stroke="#152f55" strokeWidth={2.5} dot={false} connectNulls />
-          <Line dataKey="expected" name="Expected balance" stroke="#3688e8" strokeWidth={2.5} dot={false} connectNulls />
-          <Line dataKey="conservative" name="Conservative case" stroke="#e49b42" strokeWidth={1.6} strokeDasharray="5 4" dot={false} />
-        </ComposedChart>
-      </ResponsiveContainer>
+      <PlotlyChart data={data} layout={layout} height={310} />
       <div className="chart-period-labels"><span>Reconstructed history</span><span>Forecast · next 30 days</span></div>
     </div>
   );
 }
 
 function FlowChart({ history, forecast }) {
-  const actual = history.map((row) => ({
-    label: fmtDate(row.date),
-    income: row.income,
-    expenses: row.expenses,
-  }));
-  const projected = forecast.dates.map((date, i) => ({
-    label: fmtDate(date),
-    projectedIncome: forecast.inflows?.[i] ?? 0,
-    projectedExpenses: forecast.outflows?.[i] ?? 0,
-  }));
-
-  return (
-    <ResponsiveContainer width="100%" height={270}>
-      <BarChart data={[...actual, ...projected]} margin={{ top: 10, right: 8, left: 0, bottom: 0 }} barGap={2}>
-        <CartesianGrid stroke="#edf1f6" vertical={false} />
-        <ChartAxis />
-        <YAxis tickFormatter={inrK} tick={{ fill: "#8794a8", fontSize: 11 }} axisLine={false} tickLine={false} width={50} />
-        <Tooltip content={<ChartTooltip />} />
-        <Legend iconType="circle" wrapperStyle={{ fontSize: 11, color: "#67768d", paddingTop: 10 }} />
-        <Bar dataKey="income" name="Income" fill="#3988e8" radius={[3, 3, 0, 0]} maxBarSize={14} />
-        <Bar dataKey="expenses" name="Expenses" fill="#aab8ca" radius={[3, 3, 0, 0]} maxBarSize={14} />
-        <Bar dataKey="projectedIncome" name="Expected inflow" fill="#93c5fd" radius={[3, 3, 0, 0]} maxBarSize={14} />
-        <Bar dataKey="projectedExpenses" name="Expected outflow" fill="#d8e0e9" radius={[3, 3, 0, 0]} maxBarSize={14} />
-      </BarChart>
-    </ResponsiveContainer>
-  );
+  const nPast = history.length;
+  const dates = [...history.map((row) => row.date), ...forecast.dates];
+  const income = [...history.map((row) => row.income), ...forecast.dates.map((_, i) => forecast.inflows?.[i] ?? 0)];
+  const expenses = [...history.map((row) => row.expenses), ...forecast.dates.map((_, i) => forecast.outflows?.[i] ?? 0)];
+  const bars = (name, projectedName, values, actual, projected) => ({
+    type: "bar",
+    name,
+    x: dates,
+    y: values,
+    marker: { color: dates.map((_, i) => (i < nPast ? actual : projected)) },
+    customdata: values.map((v, i) => [i < nPast ? name : projectedName, inr(v)]),
+    hovertemplate: "%{customdata[0]}: %{customdata[1]}<extra></extra>",
+  });
+  const data = [
+    bars("Income", "Expected inflow", income, "#10b981", "#a7e8d1"),
+    bars("Expenses", "Expected outflow", expenses, "#ef4444", "#ffc2b8"),
+  ];
+  const layout = {
+    xaxis: dateAxis, yaxis: moneyAxis, barmode: "group", bargap: 0.25, showlegend: true, legend: legendBelow,
+    shapes: nPast ? [dividerAt(history[nPast - 1].date)] : [],
+  };
+  return <PlotlyChart data={data} layout={layout} height={270} />;
 }
 
 function MonthlyChart({ rows }) {
-  const data = rows.map((row) => ({
-    ...row,
-    label: new Intl.DateTimeFormat("en-IN", { month: "short" }).format(new Date(`${row.month}-15T12:00:00`)),
-  }));
-  return (
-    <ResponsiveContainer width="100%" height={265}>
-      <BarChart data={data} margin={{ top: 10, right: 8, left: 0, bottom: 0 }} barGap={5}>
-        <CartesianGrid stroke="#edf1f6" vertical={false} />
-        <ChartAxis />
-        <YAxis tickFormatter={inrK} tick={{ fill: "#8794a8", fontSize: 11 }} axisLine={false} tickLine={false} width={50} />
-        <Tooltip content={<ChartTooltip />} />
-        <Legend iconType="circle" wrapperStyle={{ fontSize: 11, color: "#67768d", paddingTop: 10 }} />
-        <Bar dataKey="income" name="Income" fill="#3988e8" radius={[4, 4, 0, 0]} maxBarSize={28} />
-        <Bar dataKey="expenses" name="Expenses" fill="#aab8ca" radius={[4, 4, 0, 0]} maxBarSize={28} />
-      </BarChart>
-    </ResponsiveContainer>
-  );
+  const labels = rows.map((row) => new Intl.DateTimeFormat("en-IN", { month: "short" }).format(new Date(`${row.month}-15T12:00:00`)));
+  const bars = (name, key, color) => ({
+    type: "bar", name, x: labels, y: rows.map((row) => row[key]), marker: { color },
+    customdata: rows.map((row) => inr(row[key])), hovertemplate: `${name}: %{customdata}<extra></extra>`,
+  });
+  const data = [bars("Income", "income", "#10b981"), bars("Expenses", "expenses", "#ef4444")];
+  const layout = {
+    xaxis: { ...PLOT_AXIS, type: "category", showgrid: false }, yaxis: moneyAxis,
+    barmode: "group", bargap: 0.35, showlegend: true, legend: legendBelow,
+  };
+  return <PlotlyChart data={data} layout={layout} height={265} />;
 }
 
 function DateFilter({ value, onChange }) {
@@ -335,24 +311,47 @@ function CardHeader({ title, subtitle, action }) {
   );
 }
 
-function Kpis({ overview, forecast, summary, rangeLabel }) {
+function Kpis({ overview, forecast, summary, rangeLabel, dashboard = false }) {
   const predicted = forecast?.p50?.[forecast.p50.length - 1];
-  const items = [
-    { label: "Total income", value: summary.income, note: rangeLabel, icon: "income", color: "blue" },
-    { label: "Total expenses", value: summary.expenses, note: rangeLabel, icon: "expense", color: "orange" },
-    { label: "Current cash balance", value: overview.available_cash, note: `As of ${fmtDate(overview.as_of)}`, icon: "wallet", color: "navy" },
-    { label: "Predicted cash balance", value: predicted, note: "Expected · day 30", icon: "forecast", color: "green" },
-  ];
+  const netCashFlow = summary.income - summary.expenses;
+  const items = dashboard
+    ? [
+        { label: "Total income", value: summary.income, note: rangeLabel, icon: "income", color: "blue" },
+        { label: "Total expenses", value: summary.expenses, note: rangeLabel, icon: "expense", color: "orange" },
+        { label: "Current cash balance", value: overview.available_cash, note: `As of ${fmtDate(overview.as_of)}`, icon: "wallet", color: Number(overview.available_cash) < 0 ? "negative" : "navy" },
+        { label: "Net cash flow", value: netCashFlow, note: rangeLabel, icon: "cashflow", color: netCashFlow < 0 ? "negative" : "green", signed: true },
+        { label: "30-day predicted balance", value: predicted, note: "Expected · day 30", icon: "forecast", color: Number(predicted) < 0 ? "negative" : "indigo" },
+        {
+          label: "Cash shortage risk",
+          value: forecast.alert ? "At risk" : "Low risk",
+          note: forecast.alert ? `Potential dip · ${fmtDate(forecast.alert.date)}` : "No buffer breach expected",
+          icon: "bell",
+          color: forecast.alert ? "risk" : "green",
+          textValue: true,
+        },
+      ]
+    : [
+        { label: "Total income", value: summary.income, note: rangeLabel, icon: "income", color: "blue" },
+        { label: "Total expenses", value: summary.expenses, note: rangeLabel, icon: "expense", color: "orange" },
+        { label: "Current cash balance", value: overview.available_cash, note: `As of ${fmtDate(overview.as_of)}`, icon: "wallet", color: Number(overview.available_cash) < 0 ? "negative" : "navy" },
+        { label: "Predicted cash balance", value: predicted, note: "Expected · day 30", icon: "forecast", color: Number(predicted) < 0 ? "negative" : "green" },
+      ];
 
   return (
-    <section className="kpi-grid" aria-label="Financial summary">
+    <section className={`kpi-grid ${dashboard ? "dashboard-kpis" : ""}`} aria-label="Financial summary">
       {items.map((item) => (
         <article className={`kpi-card ${item.color}`} key={item.label}>
           <div className="kpi-top">
             <span>{item.label}</span>
             <span className="kpi-icon"><Icon name={item.icon} size={19} /></span>
           </div>
-          <strong>{inr(item.value)}</strong>
+          <strong>
+            {item.textValue
+              ? item.value
+              : item.signed
+                ? `${item.value >= 0 ? "+" : "−"}${inr(Math.abs(Number(item.value) || 0))}`
+                : inr(item.value)}
+          </strong>
           <small>{item.note}</small>
         </article>
       ))}
@@ -396,7 +395,7 @@ function InvoiceTable({ rows }) {
               <td><b>{row.invoice_id}</b></td>
               <td>{row.customer_id}</td>
               <td>{fmtDate(row.due_date, { day: "numeric", month: "short", year: "numeric" })}</td>
-              <td><span className={`status-pill ${row.days_overdue > 0 ? "overdue" : "upcoming"}`}>{row.days_overdue > 0 ? `${row.days_overdue} days` : "Not overdue"}</span></td>
+              <td><span className={`status-pill ${row.days_overdue > 0 ? "overdue" : "upcoming"}`}>{row.days_overdue > 0 ? days(row.days_overdue) : "Not overdue"}</span></td>
               <td className="amount-cell">{inr(row.amount)}</td>
             </tr>
           ))}
@@ -426,7 +425,7 @@ function ChaseTable({ rows }) {
   return (
     <div className="table-scroll">
       <table>
-        <thead><tr><th>Rank</th><th>Customer</th><th>Invoice</th><th>Amount overdue</th><th>Days late</th><th>Usual delay</th><th>Priority</th></tr></thead>
+        <thead><tr><th>Rank</th><th>Customer</th><th>Invoice</th><th>Amount due</th><th>Days late</th><th>Usual delay</th><th>Priority</th></tr></thead>
         <tbody>
           {rows.map((row, index) => {
             const priority = row.days_overdue > 15 || row.avg_delay_days > 20
@@ -440,8 +439,8 @@ function ChaseTable({ rows }) {
                 <td><b>{row.customer_id}</b></td>
                 <td>{row.invoice_id}</td>
                 <td className="amount-cell">{inr(row.amount)}</td>
-                <td><b>{Math.max(0, row.days_overdue)} days</b></td>
-                <td>{Math.round(row.avg_delay_days)} days</td>
+                <td><b>{days(Math.max(0, row.days_overdue))}</b></td>
+                <td>{days(Math.round(row.avg_delay_days))}</td>
                 <td><span className={`status-pill ${priority[0]}`}>{priority[1]}</span></td>
               </tr>
             );
@@ -461,12 +460,12 @@ function Insights({ overview, forecast, summary, backtest }) {
       ? {
           tone: "warning",
           title: "Potential cash shortage",
-          body: `The conservative forecast may dip below the ₹50,000 safety buffer around ${fmtDate(forecast.alert.date)}. Estimated gap: ${inr(forecast.alert.gap)}.`,
+          body: `The conservative forecast may dip below the ${bufferText(forecast)} safety buffer around ${fmtDate(forecast.alert.date)}. Estimated gap: ${inr(forecast.alert.gap)}.`,
         }
       : {
           tone: "positive",
           title: "Cash buffer looks steady",
-          body: "The conservative forecast stays above the ₹50,000 safety buffer over the next 30 days.",
+          body: `The conservative forecast stays above the ${bufferText(forecast)} safety buffer over the next 30 days.`,
         },
     {
       tone: overdue.length ? "warning" : "positive",
@@ -651,7 +650,7 @@ export default function App() {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    getJson(`/api/forecast?extra_delay=${extraDelay}&runs=300`)
+    getJson(`/api/forecast?extra_delay=${extraDelay}&runs=${RUNS}`)
       .then((data) => {
         if (!active) return;
         setForecast(data);
@@ -687,7 +686,24 @@ export default function App() {
   const invoices = (overview.pending_invoices || []).filter(matchesSearch);
   const bills = (overview.upcoming_bills || []).filter(matchesSearch);
   const chase = (forecast.chase || []).filter(matchesSearch);
-  const months = (overview.monthly || []).slice(-Math.ceil(range / 30));
+
+  // Build the monthly chart from the daily records selected by the date range.
+  // This allows the chart to show 12 months when the API provides a full year.
+  const monthlyMap = new Map();
+  history.forEach((row) => {
+    const month = row.date.slice(0, 7);
+    const current = monthlyMap.get(month) || { month, income: 0, expenses: 0 };
+    current.income += Number(row.income) || 0;
+    current.expenses += Number(row.expenses) || 0;
+    monthlyMap.set(month, current);
+  });
+  const monthsToShow = range === 365 ? 12 : Math.ceil(range / 30);
+  const months = [...monthlyMap.values()].slice(-monthsToShow).map((row) => ({
+    ...row,
+    income: Math.round(row.income),
+    expenses: Math.round(row.expenses),
+  }));
+
   const overdueCount = (overview.pending_invoices || []).filter((row) => row.days_overdue > 0).length;
   const hasSampleData = !overviewConnected || !forecastConnected;
   const subtitle = {
@@ -713,6 +729,7 @@ export default function App() {
     else setCollapsed((value) => !value);
   }
 
+  const plan = closeGap(forecast.alert, forecast.chase);
   const cashAlert = forecast.alert
     ? `Cash buffer risk · ${fmtDate(forecast.alert.date)}`
     : "Cash forecast is above the safety buffer";
@@ -764,7 +781,7 @@ export default function App() {
               <Icon name="search" size={17} />
               <input ref={searchRef} type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search anything..." aria-label="Search transactions, invoices, and bills" />
               {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search">×</button>}
-              <kbd>⌘ K</kbd>
+              <kbd>Ctrl K</kbd>
             </label>
             {page !== "settings" && <DateFilter value={range} onChange={setRange} />}
             <div className="notification-wrap">
@@ -792,13 +809,12 @@ export default function App() {
           <div className="content-heading">
             <div><h2>{page === "dashboard" ? "Good to see you" : navItem.label}</h2><p>{subtitle}</p></div>
             <div className="content-meta">
-                      {hasSampleData
+              {hasSampleData
                 ? <span className="data-badge sample"><i />Sample data</span>
-                        : <span className="data-badge connected"><i />API connected · prototype dataset</span>}
+                : <span className="data-badge connected"><i />API connected · prototype dataset</span>}
               <span className="as-of">As of {fmtDate(asOf, { day: "numeric", month: "short", year: "numeric" })}</span>
             </div>
           </div>
-          <p className="prototype-note">Seeded prototype records are synthetic. Import your business CSVs in Settings before relying on these figures.</p>
 
           {(overviewError || forecastError) && (
             <div className="api-notice" role="status">
@@ -814,10 +830,10 @@ export default function App() {
             <>
               {page === "dashboard" && (
                 <>
-                  <Kpis overview={overview} forecast={forecast} summary={summary} rangeLabel={rangeLabel} />
+                  <Kpis overview={overview} forecast={forecast} summary={summary} rangeLabel={rangeLabel} dashboard />
                   <div className={`forecast-banner ${forecast.alert ? "risk" : "healthy"}`}>
                     <span className="banner-icon"><Icon name={forecast.alert ? "bell" : "forecast"} /></span>
-                    <div><b>{forecast.alert ? "Cash flow needs attention" : "Your cash outlook is looking steady"}</b><p>{forecast.alert ? `Projected balance could fall below your safety buffer by ${fmtDate(forecast.alert.date)}. Estimated gap ${inr(forecast.alert.gap)}.` : "No balance dip below the ₹50,000 safety buffer is projected over the next 30 days."}</p></div>
+                    <div><b>{forecast.alert ? "Cash flow needs attention" : "Your cash outlook is looking steady"}</b><p>{forecast.alert ? `Projected balance could fall below your safety buffer by ${fmtDate(forecast.alert.date)}. Estimated gap ${inr(forecast.alert.gap)}.${plan ? ` Collecting ${plan.picks.map((r) => r.invoice_id).join(", ")} (${inr(plan.total)}) ${plan.covers ? "would cover it" : "would help close it"}.` : ""}` : `No balance dip below the ${bufferText(forecast)} safety buffer is projected over the next 30 days.`}</p></div>
                     <button type="button" onClick={() => navigate("forecast")}>View forecast <span>→</span></button>
                   </div>
                   <div className="dashboard-grid">
@@ -825,36 +841,10 @@ export default function App() {
                       <CardHeader title="Cash balance forecast" subtitle="Reconstructed history and 30-day projected range" action={<span className="chart-tag"><i />Expected balance</span>} />
                       <BalanceChart history={history} forecast={forecast} />
                     </section>
-                    <section className="card flow-card">
-                      <CardHeader title="Cash inflow vs outflow" subtitle={`${rangeLabel} actuals · next 30 days projected`} />
-                      <FlowChart history={history} forecast={forecast} />
+                    <section className="card compact-card">
+                      <CardHeader title="Upcoming bills" subtitle="Due in the next 45 days" action={<button className="text-link" type="button" onClick={() => navigate("bills")}>All bills →</button>} />
+                      <BillsList rows={bills.slice(0, 4)} />
                     </section>
-                  </div>
-                  <div className="dashboard-grid">
-                    <section className="card">
-                      <CardHeader title="Income vs expenses" subtitle="Monthly performance" action={<span className="subtle-label">Last {months.length} months</span>} />
-                      <MonthlyChart rows={months} />
-                    </section>
-                    <section className="card insights-card">
-                      <CardHeader title="Financial insights" subtitle="Highlights based on your current data" />
-                      <Insights overview={overview} forecast={forecast} summary={summary} backtest={backtest} />
-                    </section>
-                  </div>
-                  <div className="dashboard-grid lower-grid">
-                    <section className="card">
-                      <CardHeader title="Recent transactions" subtitle="Latest recorded activity" action={<button className="text-link" type="button" onClick={() => navigate("transactions")}>View all <span>→</span></button>} />
-                      <TransactionsTable rows={transactions.slice(0, 7)} empty={search ? "No transactions match your search." : "No transactions recorded for this period."} />
-                    </section>
-                    <div className="stacked-cards">
-                      <section className="card compact-card">
-                        <CardHeader title="Pending invoices" subtitle={`${overview.pending_invoices.length} open invoices`} action={<button className="text-link" type="button" onClick={() => navigate("invoices")}>All invoices →</button>} />
-                        <InvoiceTable rows={invoices.slice(0, 4)} />
-                      </section>
-                      <section className="card compact-card">
-                        <CardHeader title="Upcoming bills" subtitle="Due in the next 45 days" action={<button className="text-link" type="button" onClick={() => navigate("bills")}>All bills →</button>} />
-                        <BillsList rows={bills.slice(0, 4)} />
-                      </section>
-                    </div>
                   </div>
                   <section className="card chase-card">
                     <CardHeader
@@ -899,7 +889,7 @@ export default function App() {
               {page === "forecast" && (
                 <>
                   <section className="card forecast-detail">
-                    <CardHeader title="30-day cash balance forecast" subtitle="Reconstructed cash history and 10th–90th percentile forecast range" action={<span className="forecast-method">300-run Monte Carlo</span>} />
+                    <CardHeader title="30-day cash balance forecast" subtitle="Reconstructed cash history and 10th–90th percentile forecast range" action={<><span className="forecast-method">{RUNS.toLocaleString("en-IN")}-run Monte Carlo</span> <a className="text-link" href={`/api/chart/forecast?extra_delay=${extraDelay}`} target="_blank" rel="noreferrer">Open Plotly chart ↗</a></>} />
                     {forecast.alert && <div className="forecast-inline-alert"><Icon name="bell" size={17} /><span>Potential buffer breach on <b>{fmtDate(forecast.alert.date)}</b> · estimated gap {inr(forecast.alert.gap)}</span></div>}
                     <BalanceChart history={history} forecast={forecast} />
                   </section>
