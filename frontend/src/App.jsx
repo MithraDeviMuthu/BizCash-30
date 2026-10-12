@@ -10,8 +10,8 @@ const RANGE_OPTIONS = [
   { days: 365, label: "Last 12 months" },
 ];
 
-  { id: "dashboard", label: "Dashboard", icon: "da
-const NAV = [shboard", hint: "Overview" },
+const NAV = [
+  { id: "dashboard", label: "Dashboard", icon: "dashboard", hint: "Overview" },
   { id: "cashflow", label: "Cash Flow", icon: "cashflow", hint: "In & out" },
   { id: "transactions", label: "Transactions", icon: "transactions", hint: "Recent activity" },
   { id: "invoices", label: "Invoices", icon: "invoices", hint: "Receivables" },
